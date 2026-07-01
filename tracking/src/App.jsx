@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
 import LoadsPage from './pages/LoadsPage';
+import ResumePage from './pages/ResumePage';
 
 // Creamos una pantalla de login simple que se mostrará dentro de tu app
 function SignInPage() {
@@ -22,6 +23,8 @@ export default function App() {
     <BrowserRouter>
       <Toaster />
       <Routes>
+        <Route path="/resume" element={<ResumePage />} />
+        
         {/* Ruta de Login */}
         <Route path="/login" element={<SignInPage />} />
 

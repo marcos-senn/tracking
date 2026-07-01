@@ -20,6 +20,7 @@ app.use(clerkMiddleware({
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/loads', require('./routes/loads'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/resume', require('./routes/resume'));
 
 // Conectar a MongoDB y levantar servidor
 const PORT = process.env.PORT || 3000;
