@@ -44,7 +44,7 @@ export default function ResumePage() {
         <TopDrivers drivers={data.topDrivers} />
       </div>
 
-      {/* Gráfico de Ingresos con overflow-hidden para evitar romper margenes */}
+      {/* Gráfico de Ingresos */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Daily Revenue</h3>
         {data.dailyRevenue.length === 0 ? (
@@ -102,67 +102,4 @@ function TopDestinations({ destinations }) {
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Destinations</h3>
       <div className="space-y-3">
         {destinations.length === 0 ? (
-          <p className="text-sm text-gray-500">No data yet</p>
-        ) : destinations.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 w-5 text-right">{i + 1}</span>
-            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1 gap-2">
-                {/* break-words para que el nombre no se corte */}
-                <span className="text-sm font-medium text-gray-800 break-words">{d.city}</span>
-                <span className="text-xs text-gray-500 shrink-0">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full bg-blue-600" style={{ width: `${(d.count / max) * 100}%` }} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TopDrivers({ drivers }) {
-  const max = drivers.length > 0 ? drivers[0].count : 1;
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Drivers</h3>
-      <div className="space-y-3">
-        {drivers.length === 0 ? (
-          <p className="text-sm text-gray-500">No data yet</p>
-        ) : drivers.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 w-5 text-right">{i + 1}</span>
-            <User className="h-4 w-4 text-gray-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1 gap-2">
-                {/* break-words para que el nombre del conductor no se corte */}
-                <span className="text-sm font-medium text-gray-800 break-words">{d.driver}</span>
-                <span className="text-xs text-gray-500 shrink-0">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(d.count / max) * 100}%` }} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="h-64 rounded-xl bg-gray-200 animate-pulse" />
-        <div className="h-64 rounded-xl bg-gray-200 animate-pulse" />
-      </div>
-      <div className="h-80 rounded-xl bg-gray-200 animate-pulse" />
-      <div className="h-80 rounded-xl bg-gray-200 animate-pulse" />
-    </div>
-  );
-}
+          <p className="text-sm text-gray-500">No data yet
