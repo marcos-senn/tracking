@@ -39,50 +39,56 @@ export default function ResumePage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TopDestinations destinations={data.topDestinations} />
         <TopDrivers drivers={data.topDrivers} />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      {/* Gráfico de Ingresos con overflow-hidden para evitar romper margenes */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Daily Revenue</h3>
         {data.dailyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No revenue data yet</p>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data.dailyRevenue}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" tickFormatter={v => `$${v.toLocaleString()}`} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff' }} 
-                formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
-                labelFormatter={formatDate}
-              />
-              <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="w-full h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.dailyRevenue}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
+                <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" tickFormatter={v => `$${v.toLocaleString()}`} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff' }} 
+                  formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
+                  labelFormatter={formatDate}
+                />
+                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      {/* Gráfico de Cargas Semanales */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads</h3>
         {data.weeklyLoads.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No load data yet</p>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data.weeklyLoads}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="week" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" allowDecimals={false} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff' }} 
-                formatter={(value) => [value, 'Loads']}
-                labelFormatter={formatDate}
-              />
-              <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="w-full h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.weeklyLoads}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="week" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
+                <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" allowDecimals={false} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', background: '#fff' }} 
+                  formatter={(value) => [value, 'Loads']}
+                  labelFormatter={formatDate}
+                />
+                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>
@@ -102,9 +108,10 @@ function TopDestinations({ destinations }) {
             <span className="text-xs font-medium text-gray-500 w-5 text-right">{i + 1}</span>
             <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-800 truncate">{d.city}</span>
-                <span className="text-xs text-gray-500 ml-2">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+              <div className="flex items-center justify-between mb-1 gap-2">
+                {/* break-words para que el nombre no se corte */}
+                <span className="text-sm font-medium text-gray-800 break-words">{d.city}</span>
+                <span className="text-xs text-gray-500 shrink-0">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
               </div>
               <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                 <div className="h-full rounded-full bg-blue-600" style={{ width: `${(d.count / max) * 100}%` }} />
@@ -130,9 +137,10 @@ function TopDrivers({ drivers }) {
             <span className="text-xs font-medium text-gray-500 w-5 text-right">{i + 1}</span>
             <User className="h-4 w-4 text-gray-400 shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-800 truncate">{d.driver}</span>
-                <span className="text-xs text-gray-500 ml-2">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+              <div className="flex items-center justify-between mb-1 gap-2">
+                {/* break-words para que el nombre del conductor no se corte */}
+                <span className="text-sm font-medium text-gray-800 break-words">{d.driver}</span>
+                <span className="text-xs text-gray-500 shrink-0">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
               </div>
               <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                 <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(d.count / max) * 100}%` }} />
@@ -149,7 +157,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="h-64 rounded-xl bg-gray-200 animate-pulse" />
         <div className="h-64 rounded-xl bg-gray-200 animate-pulse" />
       </div>
