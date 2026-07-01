@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Truck, Package, MapPin, DollarSign, CalendarCheck, CalendarClock, ArrowRight } from 'lucide-react';
+import { Truck, Package, MapPin, DollarSign, CalendarCheck, CalendarClock, ArrowRight, RotateCcw } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 
 const statusColors = {
   'Available': 'bg-emerald-100 text-emerald-700',
@@ -15,8 +16,7 @@ const statusColors = {
   'Cancelled': 'bg-red-100 text-red-700',
 };
 
-const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
-const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
+const API_BASE = 'https://load-tracker-api-lfau.onrender.com/api';
 
 const getFormattedDate = (offset = 0) => {
   const date = new Date();
@@ -35,19 +35,22 @@ export default function DashboardPage() {
   const { getToken } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [loads, setLoads] = useState([]);
+  const [revenue, setRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = await getToken();
-        const [dRes, lRes] = await Promise.all([
-          fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } })
+        const [dRes, lRes, sRes] = await Promise.all([
+          fetch(`${API_BASE}/drivers`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE}/loads`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE}/settings`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         
         const dData = await dRes.json();
         const lData = await lRes.json();
+        const sData = await sRes.json();
 
         const loadsWithNames = lData.loads.map(load => {
           const driver = dData.drivers.find(d => d._id === load.driverId);
@@ -56,6 +59,7 @@ export default function DashboardPage() {
 
         setDrivers(dData.drivers);
         setLoads(loadsWithNames);
+        setRevenue(sData.totalRevenue || 0);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -65,6 +69,21 @@ export default function DashboardPage() {
 
     fetchData();
   }, [getToken]);
+
+  const handleResetRevenue = async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/settings/reset`, { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setRevenue(data.totalRevenue);
+      toast.success('Revenue restablecido a $0');
+    } catch (error) {
+      toast.error('Error al restablecer revenue');
+    }
+  };
 
   if (loading) {
     return (
@@ -81,7 +100,6 @@ export default function DashboardPage() {
 
   const available = drivers.filter(d => d.status === 'Available').length;
   const activeLoadsList = loads.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
-  const totalRevenue = loads.reduce((s, l) => s + (l.rate || 0), 0);
   
   const pickupsToday = activeLoadsList.filter(l => l.puDate === today);
   const deliveriesToday = activeLoadsList.filter(l => l.delDate === today);
@@ -92,7 +110,6 @@ export default function DashboardPage() {
   });
   const focusToday = activeLoadsList.filter(l => focusTodayIds.has(l._id));
   
-  // Lista para Próximos Eventos (Mezcla PU y DEL)
   const upcomingEvents = [];
   activeLoadsList.forEach(l => {
     if (l.puDate === tomorrow || l.puDate === dayAfter) {
@@ -111,7 +128,23 @@ export default function DashboardPage() {
         <StatCard icon={Truck} label="Total Drivers" value={drivers.length} color="text-blue-600" />
         <StatCard icon={Truck} label="Available" value={available} color="text-emerald-600" />
         <StatCard icon={Package} label="Active Loads" value={activeLoadsList.length} color="text-orange-600" />
-        <StatCard icon={DollarSign} label="Revenue" value={`$${totalRevenue.toLocaleString()}`} color="text-emerald-600" />
+        
+        {/* Tarjeta de Revenue con botón de Reset */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500 font-medium">Revenue (Mes)</p>
+            <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center text-emerald-600">
+              <DollarSign className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="flex items-end justify-between mt-2">
+            <p className="text-2xl font-bold text-gray-800">${revenue.toLocaleString()}</p>
+            <button onClick={handleResetRevenue} title="Restablecer a $0" className="text-gray-400 hover:text-red-600 transition-colors p-1">
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
         <StatCard icon={CalendarCheck} label="PU Hoy" value={pickupsToday.length} color="text-purple-600" />
         <StatCard icon={CalendarClock} label="DEL Hoy" value={deliveriesToday.length} color="text-red-600" />
       </div>
@@ -153,7 +186,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Próximos Eventos actualizado */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="p-5 border-b border-gray-200 flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-blue-600" />

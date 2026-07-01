@@ -18,6 +18,7 @@ const app = express();
 // Rutas (Sin requireAuth para que funcione en local)
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/loads', require('./routes/loads'));
+app.use('/api/settings', require('./routes/settings'));
 
 // Conectar a MongoDB y levantar servidor
 const PORT = process.env.PORT || 3000;

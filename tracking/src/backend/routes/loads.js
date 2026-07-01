@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Load = require('../models/Load');
 const Driver = require('../models/Driver');
+const Setting = require('../models/Setting'); // <-- Importamos Setting
 const { google } = require('googleapis');
-const { getAuth } = require('@clerk/express'); // <-- Importamos getAuth
+const { getAuth } = require('@clerk/express');
 
-// Configurar cliente de Google Calendar
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -18,7 +18,6 @@ oauth2Client.setCredentials({
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-// Función para sumar 1 hora si el usuario deja el campo "Time To" vacío
 function getEndTime(startTime) {
   if (!startTime) return '09:00';
   const [h, m] = startTime.split(':').map(Number);
@@ -37,17 +36,24 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Crear una carga y eventos en Google Calendar
+// Crear una carga
 router.post('/', async (req, res) => {
   try {
     const data = req.body.data;
-    const { userId } = getAuth(req); // <-- Obtenemos el ID real
-    data.userId = userId; // <-- Asignamos el creador
+    const { userId } = getAuth(req);
+    data.userId = userId;
     
     const newLoad = new Load(data);
     const savedLoad = await newLoad.save();
 
-    // BUSCAR Y ACTUALIZAR CONDUCTOR
+    // SUMAR AL REVENUE
+    if (data.rate) {
+      let setting = await Setting.findOne();
+      if (!setting) setting = await Setting.create({ totalRevenue: 0 });
+      setting.totalRevenue += Number(data.rate);
+      await setting.save();
+    }
+
     if (data.driverId) {
       const driver = await Driver.findById(data.driverId);
       if (driver) {
@@ -60,11 +66,9 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // 1. Crear evento de PICKUP (PU)
     if (data.puDate) {
       const puStart = data.puTimeFrom || '08:00';
       const puEnd = data.puTimeTo || getEndTime(puStart);
-
       const puStartDateTime = `${data.puDate}T${puStart}:00`;
       const puEndDateTime = `${data.puDate}T${puEnd}:00`;
 
@@ -83,11 +87,9 @@ router.post('/', async (req, res) => {
       savedLoad.googlePuEventId = puResponse.data.id;
     }
 
-    // 2. Crear evento de DELIVERY (DEL)
     if (data.delDate) {
       const delStart = data.delTimeFrom || '08:00';
       const delEnd = data.delTimeTo || getEndTime(delStart);
-
       const delStartDateTime = `${data.delDate}T${delStart}:00`;
       const delEndDateTime = `${data.delDate}T${delEnd}:00`;
 
@@ -120,7 +122,6 @@ router.put('/:id', async (req, res) => {
     const oldLoad = await Load.findById(req.params.id);
     if (!oldLoad) return res.status(404).json({ message: 'Carga no encontrada' });
 
-    // VERIFICAR PROPIEDAD CON getAuth
     const { userId } = getAuth(req);
     if (oldLoad.userId !== userId) {
       return res.status(403).json({ message: 'No tienes permiso para editar esta carga' });
@@ -128,7 +129,18 @@ router.put('/:id', async (req, res) => {
 
     const updatedLoad = await Load.findByIdAndUpdate(req.params.id, req.body.data, { returnDocument: 'after' });
 
-    // SINCRONIZAR CONDUCTORES
+    // ACTUALIZAR REVENUE SI CAMBIÓ EL RATE
+    const oldRate = oldLoad.rate || 0;
+    const newRate = updatedLoad.rate || 0;
+    if (oldRate !== newRate) {
+      let setting = await Setting.findOne();
+      if (setting) {
+        setting.totalRevenue += (newRate - oldRate);
+        if (setting.totalRevenue < 0) setting.totalRevenue = 0;
+        await setting.save();
+      }
+    }
+
     const oldDriverId = oldLoad.driverId ? oldLoad.driverId.toString() : null;
     const newDriverId = updatedLoad.driverId ? updatedLoad.driverId.toString() : null;
 
@@ -141,7 +153,6 @@ router.put('/:id', async (req, res) => {
       if (driver) {
         updatedLoad.driverName = driver.driver;
         updatedLoad.truck = driver.truck;
-        
         if (['Delivered', 'Cancelled'].includes(updatedLoad.status)) {
           driver.status = 'Available';
         } else {
@@ -159,16 +170,25 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Eliminar una carga y borrar los eventos de Google Calendar
+// Eliminar una carga
 router.delete('/:id', async (req, res) => {
   try {
     const load = await Load.findById(req.params.id);
     if (!load) return res.status(404).json({ message: 'Carga no encontrada' });
 
-    // VERIFICAR PROPIEDAD CON getAuth
     const { userId } = getAuth(req);
     if (load.userId !== userId) {
       return res.status(403).json({ message: 'No tienes permiso para eliminar esta carga' });
+    }
+
+    // RESTAR DEL REVENUE
+    if (load.rate) {
+      let setting = await Setting.findOne();
+      if (setting) {
+        setting.totalRevenue -= Number(load.rate);
+        if (setting.totalRevenue < 0) setting.totalRevenue = 0;
+        await setting.save();
+      }
     }
 
     if (load.driverId) {
@@ -176,17 +196,10 @@ router.delete('/:id', async (req, res) => {
     }
 
     if (load.googlePuEventId) {
-      await calendar.events.delete({
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
-        eventId: load.googlePuEventId,
-      });
+      await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googlePuEventId });
     }
-
     if (load.googleDelEventId) {
-      await calendar.events.delete({
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
-        eventId: load.googleDelEventId,
-      });
+      await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googleDelEventId });
     }
 
     await Load.findByIdAndDelete(req.params.id);
