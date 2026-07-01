@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Truck, Package, MapPin, DollarSign, CalendarCheck, CalendarClock, ArrowRight } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 
 const statusColors = {
   'Available': 'bg-emerald-100 text-emerald-700',
@@ -31,6 +32,7 @@ const tomorrow = getFormattedDate(1);
 const dayAfter = getFormattedDate(2);
 
 export default function DashboardPage() {
+  const { getToken } = useAuth(); // Hook para obtener el token de Clerk
   const [drivers, setDrivers] = useState([]);
   const [loads, setLoads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dRes, lRes] = await Promise.all([fetch(API_DRIVERS), fetch(API_LOADS)]);
+        const token = await getToken(); // Obtenemos el token
+        const [dRes, lRes] = await Promise.all([
+          fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        
         const dData = await dRes.json();
         const lData = await lRes.json();
 
@@ -57,7 +64,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, []);
+  }, [getToken]);
 
   if (loading) {
     return (
@@ -90,7 +97,6 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard icon={Truck} label="Total Drivers" value={drivers.length} color="text-blue-600" />
         <StatCard icon={Truck} label="Available" value={available} color="text-emerald-600" />
@@ -100,7 +106,6 @@ export default function DashboardPage() {
         <StatCard icon={CalendarClock} label="DEL Hoy" value={deliveriesToday.length} color="text-red-600" />
       </div>
 
-      {/* Foco de Hoy y Próximos Eventos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="p-5 border-b border-gray-200 flex items-center gap-2">
@@ -170,7 +175,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Active Loads y Driver Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="p-5 border-b border-gray-200">

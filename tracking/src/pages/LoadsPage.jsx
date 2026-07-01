@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 
 const statusColors = {
   'Booked': 'bg-purple-100 text-purple-700',
@@ -15,8 +15,8 @@ const statusColors = {
 
 const statuses = ['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'At Delivery', 'Delivered', 'Cancelled'];
 
-const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
 const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
+const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
 
 function formatDateLocal(dateStr) {
   if (!dateStr) return '';
@@ -25,7 +25,7 @@ function formatDateLocal(dateStr) {
 }
 
 export default function LoadsPage() {
-  const { user } = useUser(); // Obtenemos el usuario de Clerk
+  const { getToken, userId } = useAuth();
   const [loads, setLoads] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,11 @@ export default function LoadsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [lRes, dRes] = await Promise.all([fetch(API_LOADS), fetch(API_DRIVERS)]);
+      const token = await getToken();
+      const [lRes, dRes] = await Promise.all([
+        fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
       const lData = await lRes.json();
       const dData = await dRes.json();
       
@@ -53,7 +57,7 @@ export default function LoadsPage() {
       toast.error('Error al cargar datos');
       setLoading(false);
     }
-  }, []);
+  }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -69,7 +73,11 @@ export default function LoadsPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${API_LOADS}/${deleteId}`, { method: 'DELETE' });
+      const token = await getToken();
+      const res = await fetch(`${API_LOADS}/${deleteId}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!res.ok) throw new Error('No se pudo eliminar');
       
       setLoads((prev) => prev.filter((l) => l._id !== deleteId));
@@ -123,7 +131,7 @@ export default function LoadsPage() {
             <LoadCard 
               key={load._id} 
               load={load} 
-              currentUserId={user?.id} // Pasamos el ID del usuario logueado
+              currentUserId={userId} 
               onEdit={() => { setEditing(load); setDialogOpen(true); }} 
               onDelete={() => setDeleteId(load._id)} 
             />
@@ -137,6 +145,7 @@ export default function LoadsPage() {
           load={editing} 
           drivers={drivers} 
           onSaved={fetchData} 
+          getToken={getToken} // Le pasamos el token al formulario
         />
       )}
 
@@ -156,16 +165,13 @@ export default function LoadsPage() {
   );
 }
 
-// --- TARJETA CON VALIDACIÓN DE PROPIEDAD ---
 function LoadCard({ load, currentUserId, onEdit, onDelete }) {
-  // Comprobamos si el usuario actual es el creador
   const isOwner = load.userId === currentUserId;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 group hover:shadow-md hover:border-gray-300 transition-all duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1 min-w-0">
-          {/* Nombre del conductor y status */}
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <span className="font-bold text-lg text-indigo-600">{load.driverName || 'Unassigned'}</span>
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[load.status || ''] || 'bg-gray-100 text-gray-700'}`}>
@@ -173,7 +179,6 @@ function LoadCard({ load, currentUserId, onEdit, onDelete }) {
             </span>
           </div>
           
-          {/* Ruta */}
           <div className="flex items-center gap-2 text-base font-semibold text-gray-800 mb-3">
             <MapPin className="h-4 w-4 shrink-0 text-gray-400" />
             <span>{load.puCity || '—'}</span>
@@ -181,7 +186,6 @@ function LoadCard({ load, currentUserId, onEdit, onDelete }) {
             <span>{load.delCity || '—'}</span>
           </div>
 
-          {/* Datos detallados con colores */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-t border-gray-100 pt-3">
             <span className="text-gray-500">Load #: <span className="text-gray-900 font-bold">{load.loadNumber || '—'}</span></span>
             <span className="text-gray-500">Truck: <span className="text-gray-900 font-bold">{load.truck || '—'}</span></span>
@@ -200,7 +204,6 @@ function LoadCard({ load, currentUserId, onEdit, onDelete }) {
           </div>
         </div>
 
-        {/* Botones de acción: Solo se muestran si es el dueño */}
         {isOwner && (
           <div className="flex gap-2 transition-opacity shrink-0">
             <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
@@ -216,7 +219,7 @@ function LoadCard({ load, currentUserId, onEdit, onDelete }) {
   );
 }
 
-function LoadDialog({ onClose, load, drivers, onSaved }) {
+function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
   const empty = {
     loadNumber: '', driverId: '', status: 'Booked', rate: '',
     puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
@@ -252,12 +255,13 @@ function LoadDialog({ onClose, load, drivers, onSaved }) {
     if (!form.loadNumber.trim()) { toast.error('Load number is required'); return; }
     setSaving(true);
     try {
+      const token = await getToken();
       const method = load ? 'PUT' : 'POST';
       const url = load ? `${API_LOADS}/${load._id}` : API_LOADS;
       
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ data: form })
       });
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Pencil, Trash2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@clerk/clerk-react';
 
 const statusColors = {
   'Available': 'bg-emerald-100 text-emerald-700',
@@ -8,10 +9,10 @@ const statusColors = {
   'Off Duty': 'bg-gray-100 text-gray-600',
 };
 
-const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
-const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
+const API_URL = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
 
 export default function DriversPage() {
+  const { getToken } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -22,7 +23,8 @@ export default function DriversPage() {
 
   const fetchDrivers = async () => {
     try {
-      const res = await fetch(API_URL);
+      const token = await getToken();
+      const res = await fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       setDrivers(data.drivers);
       setLoading(false);
@@ -41,9 +43,12 @@ export default function DriversPage() {
   });
 
   const handleDelete = async () => {
-    if (!deleteId) return;
     try {
-      await fetch(`${API_URL}/${deleteId}`, { method: 'DELETE' });
+      const token = await getToken();
+      await fetch(`${API_URL}/${deleteId}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setDrivers(prev => prev.filter(d => d._id !== deleteId));
       setDeleteId(null);
       toast.success('Driver deleted');
@@ -54,10 +59,11 @@ export default function DriversPage() {
 
   const handleSave = async (formData) => {
     try {
+      const token = await getToken();
       if (editing) {
         const res = await fetch(`${API_URL}/${editing._id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ data: formData })
         });
         const updated = await res.json();
@@ -66,7 +72,7 @@ export default function DriversPage() {
       } else {
         const res = await fetch(API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ data: formData })
         });
         const saved = await res.json();
