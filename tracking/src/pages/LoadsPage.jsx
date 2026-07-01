@@ -15,8 +15,8 @@ const statusColors = {
 
 const statuses = ['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'At Delivery', 'Delivered', 'Cancelled'];
 
-const API_LOADS = 'http://localhost:3000/api/loads';
-const API_DRIVERS = 'http://localhost:3000/api/drivers';
+const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
+const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
 
 function formatDateLocal(dateStr) {
   if (!dateStr) return '';

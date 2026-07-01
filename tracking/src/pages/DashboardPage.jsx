@@ -14,8 +14,8 @@ const statusColors = {
   'Cancelled': 'bg-red-100 text-red-700',
 };
 
-const API_DRIVERS = 'http://localhost:3000/api/drivers';
-const API_LOADS = 'http://localhost:3000/api/loads';
+const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
+const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
 
 const getFormattedDate = (offset = 0) => {
   const date = new Date();

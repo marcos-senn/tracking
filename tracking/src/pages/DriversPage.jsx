@@ -8,7 +8,8 @@ const statusColors = {
   'Off Duty': 'bg-gray-100 text-gray-600',
 };
 
-const API_URL = 'http://localhost:3000/api/drivers';
+const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
+const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState([]);
