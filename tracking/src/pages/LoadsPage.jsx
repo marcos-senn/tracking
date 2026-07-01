@@ -1,0 +1,370 @@
+import { useEffect, useState, useCallback } from 'react';
+import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
+
+const statusColors = {
+  'Booked': 'bg-purple-100 text-purple-700',
+  'En Route to PU': 'bg-orange-100 text-orange-700',
+  'At Pickup': 'bg-yellow-100 text-yellow-700',
+  'En Route to DEL': 'bg-blue-100 text-blue-700',
+  'At Delivery': 'bg-cyan-100 text-cyan-700',
+  'Delivered': 'bg-emerald-100 text-emerald-700',
+  'Cancelled': 'bg-red-100 text-red-700'
+};
+
+const statuses = ['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'At Delivery', 'Delivered', 'Cancelled'];
+
+const API_LOADS = 'http://localhost:3000/api/loads';
+const API_DRIVERS = 'http://localhost:3000/api/drivers';
+
+function formatDateLocal(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+}
+
+export default function LoadsPage() {
+  const { user } = useUser(); // Obtenemos el usuario de Clerk
+  const [loads, setLoads] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [lRes, dRes] = await Promise.all([fetch(API_LOADS), fetch(API_DRIVERS)]);
+      const lData = await lRes.json();
+      const dData = await dRes.json();
+      
+      const loadsWithNames = lData.loads.map(load => {
+        const driver = dData.drivers.find(d => d._id === load.driverId);
+        return { ...load, driverName: driver ? driver.driver : 'Unassigned', truck: driver ? driver.truck : '—' };
+      });
+
+      setLoads(loadsWithNames);
+      setDrivers(dData.drivers);
+      setLoading(false);
+    } catch (error) {
+      toast.error('Error al cargar datos');
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const filtered = loads.filter((l) => {
+    if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      return l.loadNumber?.toLowerCase().includes(s) || l.driverName?.toLowerCase().includes(s) || l.puCity?.toLowerCase().includes(s) || l.delCity?.toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const res = await fetch(`${API_LOADS}/${deleteId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('No se pudo eliminar');
+      
+      setLoads((prev) => prev.filter((l) => l._id !== deleteId));
+      setDeleteId(null);
+      toast.success('Load deleted');
+    } catch (error) {
+      toast.error('No tienes permiso o hubo un error');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold text-gray-800">Loads</h1>
+        <button onClick={() => { setEditing(null); setDialogOpen(true); }} className="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm transition-colors">
+          <Plus className="h-4 w-4" /> Add Load
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input 
+            placeholder="Search loads, drivers, cities..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+          />
+        </div>
+        <select 
+          value={statusFilter} 
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2.5 w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-shadow"
+        >
+          <option value="all">All Status</option>
+          {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-28 rounded-xl bg-gray-200 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-16 text-center text-gray-500 bg-white rounded-xl border border-gray-200 shadow-sm">No loads found</div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((load) => (
+            <LoadCard 
+              key={load._id} 
+              load={load} 
+              currentUserId={user?.id} // Pasamos el ID del usuario logueado
+              onEdit={() => { setEditing(load); setDialogOpen(true); }} 
+              onDelete={() => setDeleteId(load._id)} 
+            />
+          ))}
+        </div>
+      )}
+
+      {dialogOpen && (
+        <LoadDialog 
+          onClose={() => setDialogOpen(false)} 
+          load={editing} 
+          drivers={drivers} 
+          onSaved={fetchData} 
+        />
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h2 className="text-lg font-bold mb-2 text-gray-800">Delete Load</h2>
+            <p className="text-sm text-gray-600 mb-6">Are you sure you want to delete this load?</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteId(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
+              <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- TARJETA CON VALIDACIÓN DE PROPIEDAD ---
+function LoadCard({ load, currentUserId, onEdit, onDelete }) {
+  // Comprobamos si el usuario actual es el creador
+  const isOwner = load.userId === currentUserId;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 group hover:shadow-md hover:border-gray-300 transition-all duration-200">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          {/* Nombre del conductor y status */}
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <span className="font-bold text-lg text-indigo-600">{load.driverName || 'Unassigned'}</span>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[load.status || ''] || 'bg-gray-100 text-gray-700'}`}>
+              {load.status}
+            </span>
+          </div>
+          
+          {/* Ruta */}
+          <div className="flex items-center gap-2 text-base font-semibold text-gray-800 mb-3">
+            <MapPin className="h-4 w-4 shrink-0 text-gray-400" />
+            <span>{load.puCity || '—'}</span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" />
+            <span>{load.delCity || '—'}</span>
+          </div>
+
+          {/* Datos detallados con colores */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-t border-gray-100 pt-3">
+            <span className="text-gray-500">Load #: <span className="text-gray-900 font-bold">{load.loadNumber || '—'}</span></span>
+            <span className="text-gray-500">Truck: <span className="text-gray-900 font-bold">{load.truck || '—'}</span></span>
+            <span className="text-gray-500">Rate: <span className="text-emerald-600 font-bold">${(load.rate || 0).toLocaleString()}</span></span>
+            
+            {load.puDate && (
+              <span className="text-purple-600 font-bold">
+                PU: <span className="text-purple-800 font-medium">{formatDateLocal(load.puDate)} {load.puTimeFrom || ''}</span>
+              </span>
+            )}
+            {load.delDate && (
+              <span className="text-red-600 font-bold">
+                DEL: <span className="text-red-800 font-medium">{formatDateLocal(load.delDate)} {load.delTimeFrom || ''}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Botones de acción: Solo se muestran si es el dueño */}
+        {isOwner && (
+          <div className="flex gap-2 transition-opacity shrink-0">
+            <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button onClick={onDelete} className="p-2.5 border border-gray-300 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LoadDialog({ onClose, load, drivers, onSaved }) {
+  const empty = {
+    loadNumber: '', driverId: '', status: 'Booked', rate: '',
+    puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
+    delCity: '', delDate: '', delTimeFrom: '', delTimeTo: '',
+    docsCreated: false
+  };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (load) {
+      setForm({
+        loadNumber: load.loadNumber || '',
+        driverId: load.driverId || '',
+        status: load.status || 'Booked',
+        rate: load.rate?.toString() || '',
+        puCity: load.puCity || '',
+        puDate: load.puDate || '',
+        puTimeFrom: load.puTimeFrom || '',
+        puTimeTo: load.puTimeTo || '',
+        delCity: load.delCity || '',
+        delDate: load.delDate || '',
+        delTimeFrom: load.delTimeFrom || '',
+        delTimeTo: load.delTimeTo || '',
+        docsCreated: load.docsCreated || false
+      });
+    } else {
+      setForm(empty);
+    }
+  }, [load]);
+
+  const handleSave = async () => {
+    if (!form.loadNumber.trim()) { toast.error('Load number is required'); return; }
+    setSaving(true);
+    try {
+      const method = load ? 'PUT' : 'POST';
+      const url = load ? `${API_LOADS}/${load._id}` : API_LOADS;
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: form })
+      });
+
+      if (!res.ok) throw new Error('Error al guardar');
+
+      toast.success(load ? 'Load updated' : 'Load created');
+      setSaving(false);
+      onClose();
+      onSaved();
+    } catch (error) {
+      toast.error('Failed to save');
+      setSaving(false);
+    }
+  };
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const inputClass = "mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow";
+  const labelClass = "text-sm font-medium text-gray-700";
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl">
+        <h2 className="text-xl font-bold mb-6 text-gray-800">{load ? 'Edit Load' : 'Add Load'}</h2>
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Load #</label>
+              <input value={form.loadNumber} onChange={(e) => set('loadNumber', e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Status</label>
+              <select value={form.status} onChange={(e) => set('status', e.target.value)} className={inputClass}>
+                {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Driver</label>
+            <select value={form.driverId || 'none'} onChange={(e) => set('driverId', e.target.value === 'none' ? '' : e.target.value)} className={inputClass}>
+              <option value="none">— Select —</option>
+              {drivers.map((d) => <option key={d._id} value={d._id}>{d.driver} (Truck {d.truck})</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Rate ($)</label>
+            <input type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-sm font-bold text-purple-600 mb-3">Pickup Info</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>City</label>
+                <input value={form.puCity} onChange={(e) => set('puCity', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Date</label>
+                <input type="date" value={form.puDate} onChange={(e) => set('puDate', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Time From</label>
+                <input type="time" value={form.puTimeFrom} onChange={(e) => set('puTimeFrom', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Time To</label>
+                <input type="time" value={form.puTimeTo} onChange={(e) => set('puTimeTo', e.target.value)} className={inputClass} />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-sm font-bold text-red-600 mb-3">Delivery Info</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>City</label>
+                <input value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Date</label>
+                <input type="date" value={form.delDate} onChange={(e) => set('delDate', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Time From</label>
+                <input type="time" value={form.delTimeFrom} onChange={(e) => set('delTimeFrom', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Time To</label>
+                <input type="time" value={form.delTimeTo} onChange={(e) => set('delTimeTo', e.target.value)} className={inputClass} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <input type="checkbox" checked={form.docsCreated} onChange={(e) => set('docsCreated', e.target.checked)} id="docs" className="rounded text-blue-600 focus:ring-blue-500" />
+            <label htmlFor="docs" className="text-sm text-gray-700">Docs Created</label>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

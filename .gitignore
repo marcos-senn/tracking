@@ -1,0 +1,10 @@
+# Dependencias
+node_modules/
+backend/node_modules/
+
+# Variables de entorno (Tus contraseñas)
+.env
+backend/.env
+
+# Sistema operativo
+.DS_Store
