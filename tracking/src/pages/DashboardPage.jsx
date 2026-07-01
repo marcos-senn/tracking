@@ -32,7 +32,7 @@ const tomorrow = getFormattedDate(1);
 const dayAfter = getFormattedDate(2);
 
 export default function DashboardPage() {
-  const { getToken } = useAuth(); // Hook para obtener el token de Clerk
+  const { getToken } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [loads, setLoads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = await getToken(); // Obtenemos el token
+        const token = await getToken();
         const [dRes, lRes] = await Promise.all([
           fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } })
@@ -91,7 +91,17 @@ export default function DashboardPage() {
     if (l.puDate === today || l.delDate === today) focusTodayIds.add(l._id);
   });
   const focusToday = activeLoadsList.filter(l => focusTodayIds.has(l._id));
-  const upcomingDeliveries = activeLoadsList.filter(l => l.delDate === tomorrow || l.delDate === dayAfter);
+  
+  // Lista para Próximos Eventos (Mezcla PU y DEL)
+  const upcomingEvents = [];
+  activeLoadsList.forEach(l => {
+    if (l.puDate === tomorrow || l.puDate === dayAfter) {
+      upcomingEvents.push({ ...l, type: 'PU', date: l.puDate, time: l.puTimeFrom, city: l.puCity });
+    }
+    if (l.delDate === tomorrow || l.delDate === dayAfter) {
+      upcomingEvents.push({ ...l, type: 'DEL', date: l.delDate, time: l.delTimeFrom, city: l.delCity });
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -143,30 +153,31 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Próximos Eventos actualizado */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="p-5 border-b border-gray-200 flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-blue-600" />
             <h3 className="text-lg font-semibold text-gray-800">Próximos Eventos</h3>
           </div>
           <div className="p-5 space-y-3 max-h-[500px] overflow-y-auto">
-            {upcomingDeliveries.length === 0 ? (
+            {upcomingEvents.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6">No hay eventos próximos.</p>
             ) : (
-              upcomingDeliveries.map(load => (
-                <div key={load._id} className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+              upcomingEvents.map((load, index) => (
+                <div key={index} className="p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <div className="flex justify-between items-center mb-1">
                     <div className="font-bold text-sm text-indigo-600">{load.driverName}</div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${statusColors[load.status || ''] || 'bg-gray-100 text-gray-700'}`}>
-                      {load.status}
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${load.type === 'PU' ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-700'}`}>
+                      {load.type}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mb-1">Load #{load.loadNumber}</div>
                   <div className="text-xs text-gray-500 flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    {load.delCity}
+                    {load.city}
                   </div>
                   <div className="text-xs text-gray-400 mt-1 font-medium">
-                    {load.delDate === tomorrow ? 'Mañana' : 'Pasado mañana'} - {load.delTimeFrom || '--:--'}
+                    {load.date === tomorrow ? 'Mañana' : 'Pasado mañana'} - {load.time || '--:--'}
                   </div>
                 </div>
               ))

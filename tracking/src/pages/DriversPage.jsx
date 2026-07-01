@@ -170,8 +170,8 @@ export default function DriversPage() {
       )}
 
       {deleteId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setDeleteId(null)}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-2 text-gray-800">Delete Driver</h2>
             <p className="text-sm text-gray-600 mb-6">Are you sure? This action cannot be undone.</p>
             <div className="flex justify-end gap-3">
@@ -211,8 +211,8 @@ function DriverDialog({ onClose, driver, onSave }) {
   const labelClass = "text-sm font-medium text-gray-700";
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold mb-6 text-gray-800">{driver ? 'Edit Driver' : 'Add Driver'}</h2>
         <div className="space-y-4">
           <div>

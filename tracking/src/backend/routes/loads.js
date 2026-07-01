@@ -3,6 +3,7 @@ const router = express.Router();
 const Load = require('../models/Load');
 const Driver = require('../models/Driver');
 const { google } = require('googleapis');
+const { getAuth } = require('@clerk/express'); // <-- Importamos getAuth
 
 // Configurar cliente de Google Calendar
 const oauth2Client = new google.auth.OAuth2(
@@ -40,7 +41,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = req.body.data;
-    data.userId = req.auth.userId; // ASIGNAR EL CREADOR DE LA CARGA
+    const { userId } = getAuth(req); // <-- Obtenemos el ID real
+    data.userId = userId; // <-- Asignamos el creador
     
     const newLoad = new Load(data);
     const savedLoad = await newLoad.save();
@@ -51,7 +53,6 @@ router.post('/', async (req, res) => {
       if (driver) {
         data.driverName = driver.driver;
         data.truck = driver.truck;
-        // Si la carga está activa, el conductor pasa a "En Route"
         if (['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'At Delivery'].includes(data.status)) {
           driver.status = 'En Route';
           await driver.save();
@@ -119,8 +120,9 @@ router.put('/:id', async (req, res) => {
     const oldLoad = await Load.findById(req.params.id);
     if (!oldLoad) return res.status(404).json({ message: 'Carga no encontrada' });
 
-    // VERIFICAR PROPIEDAD
-    if (oldLoad.userId !== req.auth.userId) {
+    // VERIFICAR PROPIEDAD CON getAuth
+    const { userId } = getAuth(req);
+    if (oldLoad.userId !== userId) {
       return res.status(403).json({ message: 'No tienes permiso para editar esta carga' });
     }
 
@@ -130,12 +132,10 @@ router.put('/:id', async (req, res) => {
     const oldDriverId = oldLoad.driverId ? oldLoad.driverId.toString() : null;
     const newDriverId = updatedLoad.driverId ? updatedLoad.driverId.toString() : null;
 
-    // Si se cambió de conductor, el antiguo vuelve a estar Available
     if (oldDriverId && oldDriverId !== newDriverId) {
       await Driver.findByIdAndUpdate(oldDriverId, { status: 'Available' });
     }
 
-    // Actualizar el estado del conductor actual
     if (newDriverId) {
       const driver = await Driver.findById(newDriverId);
       if (driver) {
@@ -165,17 +165,16 @@ router.delete('/:id', async (req, res) => {
     const load = await Load.findById(req.params.id);
     if (!load) return res.status(404).json({ message: 'Carga no encontrada' });
 
-    // VERIFICAR PROPIEDAD
-    if (load.userId !== req.auth.userId) {
+    // VERIFICAR PROPIEDAD CON getAuth
+    const { userId } = getAuth(req);
+    if (load.userId !== userId) {
       return res.status(403).json({ message: 'No tienes permiso para eliminar esta carga' });
     }
 
-    // Si la carga tenía un conductor, lo liberamos a "Available"
     if (load.driverId) {
       await Driver.findByIdAndUpdate(load.driverId, { status: 'Available' });
     }
 
-    // Borrar evento de PU si existe
     if (load.googlePuEventId) {
       await calendar.events.delete({
         calendarId: process.env.GOOGLE_CALENDAR_ID,
@@ -183,7 +182,6 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Borrar evento de DEL si existe
     if (load.googleDelEventId) {
       await calendar.events.delete({
         calendarId: process.env.GOOGLE_CALENDAR_ID,
