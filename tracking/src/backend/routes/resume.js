@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const Load = require('../models/Load');
+const Driver = require('../models/Driver'); // <-- Importamos Driver
 
 router.get('/', async (req, res) => {
   try {
-    // 1. Top Destinos (Ignora ciudades vacías)
+    // 1. Top Destinos
     const topDestinations = await Load.aggregate([
       { $match: { delCity: { $nin: [null, "", "Unassigned"] } } },
       { $group: { _id: "$delCity", count: { $sum: 1 } } },
@@ -13,14 +14,21 @@ router.get('/', async (req, res) => {
       { $project: { _id: 0, city: "$_id", count: 1 } }
     ]);
 
-    // 2. Top Conductores (Ignora nombres vacíos o "Unassigned")
-    const topDrivers = await Load.aggregate([
-      { $match: { driverName: { $nin: [null, "", "Unassigned"] } } },
-      { $group: { _id: "$driverName", count: { $sum: 1 } } },
+    // 2. Top Conductores (Buscando por ID real)
+    const topDriversRaw = await Load.aggregate([
+      { $match: { driverId: { $nin: [null, ""] } } },
+      { $group: { _id: "$driverId", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
-      { $limit: 5 },
-      { $project: { _id: 0, driver: "$_id", count: 1 } }
+      { $limit: 5 }
     ]);
+
+    const topDrivers = [];
+    for (const item of topDriversRaw) {
+      const driver = await Driver.findById(item._id);
+      if (driver) {
+        topDrivers.push({ driver: driver.driver, count: item.count });
+      }
+    }
 
     // 3. Ingresos Diarios
     const dailyRevenue = await Load.aggregate([
