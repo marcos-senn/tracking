@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Load = require('../models/Load');
 const Driver = require('../models/Driver');
-const Setting = require('../models/Setting'); // <-- Importamos Setting
+const Setting = require('../models/Setting');
 const { google } = require('googleapis');
 const { getAuth } = require('@clerk/express');
 
@@ -129,7 +129,6 @@ router.put('/:id', async (req, res) => {
 
     const updatedLoad = await Load.findByIdAndUpdate(req.params.id, req.body.data, { returnDocument: 'after' });
 
-    // ACTUALIZAR REVENUE SI CAMBIÓ EL RATE
     const oldRate = oldLoad.rate || 0;
     const newRate = updatedLoad.rate || 0;
     if (oldRate !== newRate) {
@@ -195,11 +194,22 @@ router.delete('/:id', async (req, res) => {
       await Driver.findByIdAndUpdate(load.driverId, { status: 'Available' });
     }
 
+    // Borrar evento de PU de forma segura
     if (load.googlePuEventId) {
-      await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googlePuEventId });
+      try {
+        await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googlePuEventId });
+      } catch (err) {
+        console.log('Evento de Google Calendar (PU) no encontrado, continuando...');
+      }
     }
+
+    // Borrar evento de DEL de forma segura
     if (load.googleDelEventId) {
-      await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googleDelEventId });
+      try {
+        await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googleDelEventId });
+      } catch (err) {
+        console.log('Evento de Google Calendar (DEL) no encontrado, continuando...');
+      }
     }
 
     await Load.findByIdAndDelete(req.params.id);
