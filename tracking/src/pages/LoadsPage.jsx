@@ -34,7 +34,7 @@ export default function LoadsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const [statusModal, setStatusModal] = useState(null); // { id, status }
+  const [statusModal, setStatusModal] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,7 +51,6 @@ export default function LoadsPage() {
         return { ...load, driverName: driver ? driver.driver : 'Unassigned', truck: driver ? driver.truck : '—' };
       });
 
-      // Filtramos para que en la página principal solo se vean las ACTIVAS
       const activeLoads = loadsWithNames.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
 
       setLoads(activeLoads);
@@ -99,7 +98,6 @@ export default function LoadsPage() {
         body: JSON.stringify({ data: { status: statusModal.status } })
       });
       
-      // Quitamos la carga de la vista principal
       setLoads(prev => prev.filter(l => l._id !== statusModal.id));
       toast.success(`Carga marcada como ${statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}`);
       setStatusModal(null);
@@ -184,7 +182,6 @@ export default function LoadsPage() {
         </div>
       )}
 
-      {/* Modal de Confirmación para Completar/Suspender */}
       {statusModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setStatusModal(null)}>
           <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -269,8 +266,7 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
   const empty = {
     loadNumber: '', driverId: '', status: 'Booked', rate: '',
     puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
-    delCity: '', delDate: '', delTimeFrom: '', delTimeTo: '',
-    docsCreated: false
+    delCity: '', delDate: '', delTimeFrom: '', delTimeTo: ''
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -289,8 +285,7 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
         delCity: load.delCity || '',
         delDate: load.delDate || '',
         delTimeFrom: load.delTimeFrom || '',
-        delTimeTo: load.delTimeTo || '',
-        docsCreated: load.docsCreated || false
+        delTimeTo: load.delTimeTo || ''
       });
     } else {
       setForm(empty);
@@ -298,7 +293,12 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
   }, [load]);
 
   const handleSave = async () => {
-    if (!form.loadNumber.trim()) { toast.error('Load number is required'); return; }
+    // Validaciones obligatorias
+    if (!form.loadNumber.trim()) { toast.error('Load # es obligatorio'); return; }
+    if (!form.driverId) { toast.error('Driver es obligatorio'); return; }
+    if (!form.rate.trim()) { toast.error('Rate es obligatorio'); return; }
+    if (!form.delCity.trim()) { toast.error('Destination (Delivery City) es obligatorio'); return; }
+
     setSaving(true);
     try {
       const token = await getToken();
@@ -334,8 +334,8 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Load #</label>
-              <input value={form.loadNumber} onChange={(e) => set('loadNumber', e.target.value)} className={inputClass} />
+              <label className={labelClass}>Load # *</label>
+              <input required value={form.loadNumber} onChange={(e) => set('loadNumber', e.target.value)} className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Status</label>
@@ -346,16 +346,16 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
           </div>
 
           <div>
-            <label className={labelClass}>Driver</label>
-            <select value={form.driverId || 'none'} onChange={(e) => set('driverId', e.target.value === 'none' ? '' : e.target.value)} className={inputClass}>
+            <label className={labelClass}>Driver *</label>
+            <select required value={form.driverId || 'none'} onChange={(e) => set('driverId', e.target.value === 'none' ? '' : e.target.value)} className={inputClass}>
               <option value="none">— Select —</option>
               {drivers.map((d) => <option key={d._id} value={d._id}>{d.driver} (Truck {d.truck})</option>)}
             </select>
           </div>
 
           <div>
-            <label className={labelClass}>Rate ($)</label>
-            <input type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
+            <label className={labelClass}>Rate ($) *</label>
+            <input required type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
           </div>
 
           <div className="border-t pt-4">
@@ -384,8 +384,8 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
             <p className="text-sm font-bold text-red-600 mb-3">Delivery Info</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>City</label>
-                <input value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
+                <label className={labelClass}>City (Destination) *</label>
+                <input required value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Date</label>
@@ -400,11 +400,6 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
                 <input type="time" value={form.delTimeTo} onChange={(e) => set('delTimeTo', e.target.value)} className={inputClass} />
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
-            <input type="checkbox" checked={form.docsCreated} onChange={(e) => set('docsCreated', e.target.checked)} id="docs" className="rounded text-blue-600 focus:ring-blue-500" />
-            <label htmlFor="docs" className="text-sm text-gray-700">Docs Created</label>
           </div>
         </div>
         

@@ -13,6 +13,12 @@ function formatDate(d) {
   return `${day}/${m}`;
 }
 
+function formatDateLocal(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+}
+
 export default function ResumePage() {
   const { getToken } = useAuth();
   const [data, setData] = useState(null);
@@ -44,8 +50,6 @@ export default function ResumePage() {
         body: JSON.stringify({ type })
       });
       const newSettings = await res.json();
-      
-      // Actualizamos solo los contadores en el estado
       setData(prev => ({ ...prev, counters: newSettings }));
       toast.success('Contador restablecido a 0');
     } catch (error) {
@@ -60,7 +64,6 @@ export default function ResumePage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
 
-      {/* Contadores de Historial */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
           <div className="flex justify-between items-center mb-2">
@@ -88,7 +91,6 @@ export default function ResumePage() {
         <TopDrivers drivers={data.topDrivers} />
       </div>
 
-      {/* Gráfico de Ingresos */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Daily Revenue</h3>
         {data.dailyRevenue.length === 0 ? (
@@ -112,7 +114,6 @@ export default function ResumePage() {
         )}
       </div>
 
-      {/* Gráfico de Cargas Semanales */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads</h3>
         {data.weeklyLoads.length === 0 ? (
@@ -136,13 +137,13 @@ export default function ResumePage() {
         )}
       </div>
 
-      {/* HISTORIAL DE CARGAS */}
+      {/* HISTORIAL DE CARGAS CON SCROLL */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Historial de Cargas</h3>
         {data.history.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No hay cargas en el historial todavía.</p>
         ) : (
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
             {data.history.map(load => (
               <div key={load._id} className="p-4 rounded-lg border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -150,6 +151,15 @@ export default function ResumePage() {
                   <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                     <MapPin className="h-3 w-3" />
                     {load.puCity} → {load.delCity}
+                  </div>
+                  {/* FECHAS Y HORARIOS DE PU Y DEL */}
+                  <div className="flex flex-col sm:flex-row gap-x-4 gap-y-1 mt-2 text-xs">
+                    {load.puDate && (
+                      <span className="text-purple-700 font-medium">PU: {formatDateLocal(load.puDate)} {load.puTimeFrom || ''}</span>
+                    )}
+                    {load.delDate && (
+                      <span className="text-red-700 font-medium">DEL: {formatDateLocal(load.delDate)} {load.delTimeFrom || ''}</span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">Rate: ${load.rate || 0}</div>
                 </div>
