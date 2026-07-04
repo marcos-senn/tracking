@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Load = require('../models/Load');
-const Driver = require('../models/Driver'); // <-- Importamos Driver
+const Driver = require('../models/Driver');
+const Setting = require('../models/Setting');
 
 router.get('/', async (req, res) => {
   try {
@@ -14,7 +15,7 @@ router.get('/', async (req, res) => {
       { $project: { _id: 0, city: "$_id", count: 1 } }
     ]);
 
-    // 2. Top Conductores (Buscando por ID real)
+    // 2. Top Conductores
     const topDriversRaw = await Load.aggregate([
       { $match: { driverId: { $nin: [null, ""] } } },
       { $group: { _id: "$driverId", count: { $sum: 1 } } },
@@ -25,9 +26,7 @@ router.get('/', async (req, res) => {
     const topDrivers = [];
     for (const item of topDriversRaw) {
       const driver = await Driver.findById(item._id);
-      if (driver) {
-        topDrivers.push({ driver: driver.driver, count: item.count });
-      }
+      if (driver) topDrivers.push({ driver: driver.driver, count: item.count });
     }
 
     // 3. Ingresos Diarios
@@ -48,7 +47,23 @@ router.get('/', async (req, res) => {
       { $project: { _id: 0, week: "$_id", count: 1 } }
     ]);
 
-    res.json({ topDestinations, topDrivers, dailyRevenue, weeklyLoads });
+    // 5. Historial (Cargas Delivered o Cancelled)
+    const history = await Load.find({ 
+      status: { $in: ['Delivered', 'Cancelled'] } 
+    }).sort({ updatedAt: -1 }).limit(50);
+
+    // 6. Contadores
+    let setting = await Setting.findOne();
+    if (!setting) setting = { totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 };
+
+    res.json({ 
+      topDestinations, 
+      topDrivers, 
+      dailyRevenue, 
+      weeklyLoads, 
+      history, 
+      counters: setting 
+    });
   } catch (error) {
     console.error('Error fetching resume:', error);
     res.status(500).json({ message: 'Error del servidor' });

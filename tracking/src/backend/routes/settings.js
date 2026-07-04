@@ -2,12 +2,12 @@ const express = require('express');
 const router = express.Router();
 const Setting = require('../models/Setting');
 
-// Obtener el revenue actual
+// Obtener los contadores
 router.get('/', async (req, res) => {
   try {
     let setting = await Setting.findOne();
     if (!setting) {
-      setting = await Setting.create({ totalRevenue: 0 });
+      setting = await Setting.create({ totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 });
     }
     res.json(setting);
   } catch (error) {
@@ -15,14 +15,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Resetear el revenue a 0
+// Resetear contadores
 router.post('/reset', async (req, res) => {
   try {
     let setting = await Setting.findOne();
     if (!setting) {
-      setting = await Setting.create({ totalRevenue: 0 });
+      setting = await Setting.create({ totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 });
     } else {
-      setting.totalRevenue = 0;
+      // Resetea solo lo que se pide
+      if (req.body.type === 'revenue') setting.totalRevenue = 0;
+      if (req.body.type === 'completed') setting.completedLoads = 0;
+      if (req.body.type === 'suspended') setting.suspendedLoads = 0;
       await setting.save();
     }
     res.json(setting);

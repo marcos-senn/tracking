@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/clerk-react';
 
@@ -34,6 +34,7 @@ export default function LoadsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [statusModal, setStatusModal] = useState(null); // { id, status }
 
   const fetchData = useCallback(async () => {
     try {
@@ -50,7 +51,10 @@ export default function LoadsPage() {
         return { ...load, driverName: driver ? driver.driver : 'Unassigned', truck: driver ? driver.truck : '—' };
       });
 
-      setLoads(loadsWithNames);
+      // Filtramos para que en la página principal solo se vean las ACTIVAS
+      const activeLoads = loadsWithNames.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
+
+      setLoads(activeLoads);
       setDrivers(dData.drivers);
       setLoading(false);
     } catch (error) {
@@ -71,20 +75,37 @@ export default function LoadsPage() {
   });
 
   const handleDelete = async () => {
-    if (!deleteId) return;
     try {
       const token = await getToken();
-      const res = await fetch(`${API_LOADS}/${deleteId}`, { 
+      await fetch(`${API_LOADS}/${deleteId}`, { 
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('No se pudo eliminar');
-      
       setLoads((prev) => prev.filter((l) => l._id !== deleteId));
       setDeleteId(null);
       toast.success('Load deleted');
     } catch (error) {
-      toast.error('No tienes permiso o hubo un error');
+      toast.error('Error al eliminar');
+    }
+  };
+
+  const confirmStatusChange = async () => {
+    if (!statusModal) return;
+    try {
+      const token = await getToken();
+      await fetch(`${API_LOADS}/${statusModal.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ data: { status: statusModal.status } })
+      });
+      
+      // Quitamos la carga de la vista principal
+      setLoads(prev => prev.filter(l => l._id !== statusModal.id));
+      toast.success(`Carga marcada como ${statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}`);
+      setStatusModal(null);
+    } catch (error) {
+      toast.error('Error al actualizar estado');
+      setStatusModal(null);
     }
   };
 
@@ -113,7 +134,7 @@ export default function LoadsPage() {
           className="border border-gray-300 rounded-lg px-3 py-2.5 w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-shadow"
         >
           <option value="all">All Status</option>
-          {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+          {statuses.filter(s => s !== 'Delivered' && s !== 'Cancelled').map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
@@ -124,7 +145,7 @@ export default function LoadsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="py-16 text-center text-gray-500 bg-white rounded-xl border border-gray-200 shadow-sm">No loads found</div>
+        <div className="py-16 text-center text-gray-500 bg-white rounded-xl border border-gray-200 shadow-sm">No active loads</div>
       ) : (
         <div className="space-y-4">
           {filtered.map((load) => (
@@ -133,7 +154,8 @@ export default function LoadsPage() {
               load={load} 
               currentUserId={userId} 
               onEdit={() => { setEditing(load); setDialogOpen(true); }} 
-              onDelete={() => setDeleteId(load._id)} 
+              onDelete={() => setDeleteId(load._id)}
+              onStatusChange={(status) => setStatusModal({ id: load._id, status })}
             />
           ))}
         </div>
@@ -161,11 +183,29 @@ export default function LoadsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmación para Completar/Suspender */}
+      {statusModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setStatusModal(null)}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-2 text-gray-800">Confirmar Acción</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              ¿Realmente deseas marcar esta carga como <strong>{statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}</strong>? Se moverá al historial y ya no la verás en tu lista principal.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setStatusModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancelar</button>
+              <button onClick={confirmStatusChange} className={`px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${statusModal.status === 'Delivered' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                Sí, confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function LoadCard({ load, currentUserId, onEdit, onDelete }) {
+function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   const isOwner = load.userId === currentUserId;
 
   return (
@@ -205,11 +245,17 @@ function LoadCard({ load, currentUserId, onEdit, onDelete }) {
         </div>
 
         {isOwner && (
-          <div className="flex gap-2 transition-opacity shrink-0">
-            <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          <div className="flex flex-wrap gap-2 transition-opacity shrink-0">
+            <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors" title="Editar">
               <Pencil className="h-4 w-4" />
             </button>
-            <button onClick={onDelete} className="p-2.5 border border-gray-300 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors">
+            <button onClick={() => onStatusChange('Delivered')} className="p-2.5 border border-emerald-300 rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors" title="Marcar Completada">
+              <CheckCircle className="h-4 w-4" />
+            </button>
+            <button onClick={() => onStatusChange('Cancelled')} className="p-2.5 border border-red-300 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Marcar Suspendida">
+              <XCircle className="h-4 w-4" />
+            </button>
+            <button onClick={onDelete} className="p-2.5 border border-gray-300 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors" title="Eliminar">
               <Trash2 className="h-4 w-4" />
             </button>
           </div>

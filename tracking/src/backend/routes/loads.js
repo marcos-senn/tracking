@@ -46,10 +46,9 @@ router.post('/', async (req, res) => {
     const newLoad = new Load(data);
     const savedLoad = await newLoad.save();
 
-    // SUMAR AL REVENUE
     if (data.rate) {
       let setting = await Setting.findOne();
-      if (!setting) setting = await Setting.create({ totalRevenue: 0 });
+      if (!setting) setting = await Setting.create({ totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 });
       setting.totalRevenue += Number(data.rate);
       await setting.save();
     }
@@ -129,6 +128,7 @@ router.put('/:id', async (req, res) => {
 
     const updatedLoad = await Load.findByIdAndUpdate(req.params.id, req.body.data, { returnDocument: 'after' });
 
+    // Lógica de Revenue
     const oldRate = oldLoad.rate || 0;
     const newRate = updatedLoad.rate || 0;
     if (oldRate !== newRate) {
@@ -140,6 +140,18 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    // Lógica de Contadores de Historial
+    const oldStatus = oldLoad.status;
+    const newStatus = updatedLoad.status;
+    if (oldStatus !== newStatus) {
+      let setting = await Setting.findOne();
+      if (!setting) setting = await Setting.create({});
+      if (newStatus === 'Delivered') setting.completedLoads += 1;
+      if (newStatus === 'Cancelled') setting.suspendedLoads += 1;
+      await setting.save();
+    }
+
+    // Liberar conductor si la carga se completó o canceló
     const oldDriverId = oldLoad.driverId ? oldLoad.driverId.toString() : null;
     const newDriverId = updatedLoad.driverId ? updatedLoad.driverId.toString() : null;
 
@@ -180,7 +192,6 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'No tienes permiso para eliminar esta carga' });
     }
 
-    // RESTAR DEL REVENUE
     if (load.rate) {
       let setting = await Setting.findOne();
       if (setting) {
@@ -194,22 +205,11 @@ router.delete('/:id', async (req, res) => {
       await Driver.findByIdAndUpdate(load.driverId, { status: 'Available' });
     }
 
-    // Borrar evento de PU de forma segura
     if (load.googlePuEventId) {
-      try {
-        await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googlePuEventId });
-      } catch (err) {
-        console.log('Evento de Google Calendar (PU) no encontrado, continuando...');
-      }
+      try { await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googlePuEventId }); } catch (err) {}
     }
-
-    // Borrar evento de DEL de forma segura
     if (load.googleDelEventId) {
-      try {
-        await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googleDelEventId });
-      } catch (err) {
-        console.log('Evento de Google Calendar (DEL) no encontrado, continuando...');
-      }
+      try { await calendar.events.delete({ calendarId: process.env.GOOGLE_CALENDAR_ID, eventId: load.googleDelEventId }); } catch (err) {}
     }
 
     await Load.findByIdAndDelete(req.params.id);

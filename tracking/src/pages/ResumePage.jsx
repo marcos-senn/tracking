@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { MapPin, User } from 'lucide-react';
+import { MapPin, User, RotateCcw } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const API_URL = 'https://load-tracker-api-lfau.onrender.com/api/resume';
+const API_SETTINGS = 'https://load-tracker-api-lfau.onrender.com/api/settings';
 
 function formatDate(d) {
   if (!d) return '';
@@ -16,21 +18,40 @@ export default function ResumePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } });
+      const d = await res.json();
+      setData(d);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching resume:", error);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await getToken();
-        const res = await fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } });
-        const d = await res.json();
-        setData(d);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching resume:", error);
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, [getToken]);
+  }, []);
+
+  const handleResetCounter = async (type) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_SETTINGS}/reset`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ type })
+      });
+      const newSettings = await res.json();
+      
+      // Actualizamos solo los contadores en el estado
+      setData(prev => ({ ...prev, counters: newSettings }));
+      toast.success('Contador restablecido a 0');
+    } catch (error) {
+      toast.error('Error al restablecer');
+    }
+  };
 
   if (loading) return <LoadingSkeleton />;
   if (!data) return null;
@@ -38,6 +59,29 @@ export default function ResumePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
+
+      {/* Contadores de Historial */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-gray-800">Cargas Completadas</h3>
+            <button onClick={() => handleResetCounter('completed')} className="text-gray-400 hover:text-red-600 transition-colors p-1" title="Resetear contador">
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-4xl font-bold text-emerald-600 mt-2">{data.counters?.completedLoads || 0}</p>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-gray-800">Cargas Suspendidas</h3>
+            <button onClick={() => handleResetCounter('suspended')} className="text-gray-400 hover:text-red-600 transition-colors p-1" title="Resetear contador">
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-4xl font-bold text-red-600 mt-2">{data.counters?.suspendedLoads || 0}</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TopDestinations destinations={data.topDestinations} />
@@ -91,6 +135,32 @@ export default function ResumePage() {
           </div>
         )}
       </div>
+
+      {/* HISTORIAL DE CARGAS */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Historial de Cargas</h3>
+        {data.history.length === 0 ? (
+          <p className="text-sm text-gray-500 py-8 text-center">No hay cargas en el historial todavía.</p>
+        ) : (
+          <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            {data.history.map(load => (
+              <div key={load._id} className="p-4 rounded-lg border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold text-sm text-gray-800 break-words">#{load.loadNumber} - {load.driverName}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                    <MapPin className="h-3 w-3" />
+                    {load.puCity} → {load.delCity}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">Rate: ${load.rate || 0}</div>
+                </div>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${load.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {load.status === 'Delivered' ? 'Completada' : 'Suspendida'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -137,7 +207,6 @@ function TopDrivers({ drivers }) {
             <User className="h-4 w-4 text-gray-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start mb-1 gap-2">
-                {/* min-w-0 y break-words aseguran que el nombre se muestre completo */}
                 <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.driver}</span>
                 <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
               </div>
