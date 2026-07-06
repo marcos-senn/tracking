@@ -27,9 +27,11 @@ const getFormattedDate = (offset = 0) => {
   return `${year}-${month}-${day}`;
 };
 
-const today = getFormattedDate(0);
-const tomorrow = getFormattedDate(1);
-const dayAfter = getFormattedDate(2);
+const normalizeDateValue = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+};
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
@@ -98,25 +100,32 @@ export default function DashboardPage() {
     );
   }
 
+  const today = getFormattedDate(0);
+  const tomorrow = getFormattedDate(1);
+  const dayAfter = getFormattedDate(2);
+
   const available = drivers.filter(d => d.status === 'Available').length;
   const activeLoadsList = loads.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
   
-  const pickupsToday = activeLoadsList.filter(l => l.puDate === today);
-  const deliveriesToday = activeLoadsList.filter(l => l.delDate === today);
+  const pickupsToday = activeLoadsList.filter(l => normalizeDateValue(l.puDate) === today);
+  const deliveriesToday = activeLoadsList.filter(l => normalizeDateValue(l.delDate) === today);
   
   const focusTodayIds = new Set();
   activeLoadsList.forEach(l => {
-    if (l.puDate === today || l.delDate === today) focusTodayIds.add(l._id);
+    if (normalizeDateValue(l.puDate) === today || normalizeDateValue(l.delDate) === today) focusTodayIds.add(l._id);
   });
   const focusToday = activeLoadsList.filter(l => focusTodayIds.has(l._id));
   
   const upcomingEvents = [];
   activeLoadsList.forEach(l => {
-    if (l.puDate === tomorrow || l.puDate === dayAfter) {
-      upcomingEvents.push({ ...l, type: 'PU', date: l.puDate, time: l.puTimeFrom, city: l.puCity });
+    const puDate = normalizeDateValue(l.puDate);
+    const delDate = normalizeDateValue(l.delDate);
+
+    if (puDate === tomorrow || puDate === dayAfter) {
+      upcomingEvents.push({ ...l, type: 'PU', date: puDate, time: l.puTimeFrom, city: l.puCity });
     }
-    if (l.delDate === tomorrow || l.delDate === dayAfter) {
-      upcomingEvents.push({ ...l, type: 'DEL', date: l.delDate, time: l.delTimeFrom, city: l.delCity });
+    if (delDate === tomorrow || delDate === dayAfter) {
+      upcomingEvents.push({ ...l, type: 'DEL', date: delDate, time: l.delTimeFrom, city: l.delCity });
     }
   });
 
