@@ -5,6 +5,7 @@ const Driver = require('../models/Driver');
 const Setting = require('../models/Setting');
 const { google } = require('googleapis');
 const { getAuth } = require('@clerk/express');
+const { buildCalendarEventPayload } = require('../utils/googleCalendar');
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -66,18 +67,17 @@ router.post('/', async (req, res) => {
     }
 
     if (data.puDate) {
-      const puStart = data.puTimeFrom || '08:00';
-      const puEnd = data.puTimeTo || getEndTime(puStart);
-      const puStartDateTime = `${data.puDate}T${puStart}:00`;
-      const puEndDateTime = `${data.puDate}T${puEnd}:00`;
-
-      const puEvent = {
-        summary: `PU - Load #${data.loadNumber} - ${data.driverName || 'Unassigned'}`,
-        location: data.puCity,
-        description: `Truck: ${data.truck || 'N/A'}, Rate: $${data.rate || 0}`,
-        start: { dateTime: puStartDateTime, timeZone: 'America/Chicago' }, 
-        end: { dateTime: puEndDateTime, timeZone: 'America/Chicago' },
-      };
+      const puEvent = buildCalendarEventPayload({
+        type: 'PU',
+        loadNumber: data.loadNumber,
+        driverName: data.driverName,
+        city: data.puCity,
+        date: data.puDate,
+        timeFrom: data.puTimeFrom,
+        timeTo: data.puTimeTo,
+        truck: data.truck,
+        rate: data.rate,
+      });
 
       const puResponse = await calendar.events.insert({
         calendarId: process.env.GOOGLE_CALENDAR_ID,
@@ -87,18 +87,17 @@ router.post('/', async (req, res) => {
     }
 
     if (data.delDate) {
-      const delStart = data.delTimeFrom || '08:00';
-      const delEnd = data.delTimeTo || getEndTime(delStart);
-      const delStartDateTime = `${data.delDate}T${delStart}:00`;
-      const delEndDateTime = `${data.delDate}T${delEnd}:00`;
-
-      const delEvent = {
-        summary: `DEL - Load #${data.loadNumber} - ${data.driverName || 'Unassigned'}`,
-        location: data.delCity,
-        description: `Truck: ${data.truck || 'N/A'}, Rate: $${data.rate || 0}`,
-        start: { dateTime: delStartDateTime, timeZone: 'America/Chicago' },
-        end: { dateTime: delEndDateTime, timeZone: 'America/Chicago' },
-      };
+      const delEvent = buildCalendarEventPayload({
+        type: 'DEL',
+        loadNumber: data.loadNumber,
+        driverName: data.driverName,
+        city: data.delCity,
+        date: data.delDate,
+        timeFrom: data.delTimeFrom,
+        timeTo: data.delTimeTo,
+        truck: data.truck,
+        rate: data.rate,
+      });
 
       const delResponse = await calendar.events.insert({
         calendarId: process.env.GOOGLE_CALENDAR_ID,
