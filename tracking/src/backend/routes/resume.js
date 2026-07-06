@@ -29,24 +29,29 @@ router.get('/', async (req, res) => {
       if (driver) topDrivers.push({ driver: driver.driver, count: item.count });
     }
 
-    // 3. Ingresos Diarios y cargas semanales por fecha agendada
-    const loadsForCharts = await Load.find({
-      $or: [
-        { puDate: { $nin: [null, ""] } },
-        { delDate: { $nin: [null, ""] } }
-      ]
-    }).select('puDate delDate rate');
+    // 3. Ingresos Diarios y cargas semanales por fecha de carga
+    const loadsForCharts = await Load.find({}).select('createdAt rate');
 
     const dailyRevenueMap = new Map();
     const weeklyLoadsMap = new Map();
 
+    const toDateKey = (value) => {
+      if (!value) return null;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return null;
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     loadsForCharts.forEach((load) => {
-      const scheduledDate = load.puDate || load.delDate;
-      if (!scheduledDate) return;
+      const chartDate = toDateKey(load.createdAt) || toDateKey(load.puDate) || toDateKey(load.delDate);
+      if (!chartDate) return;
 
       const revenue = Number(load.rate) || 0;
-      dailyRevenueMap.set(scheduledDate, (dailyRevenueMap.get(scheduledDate) || 0) + revenue);
-      weeklyLoadsMap.set(scheduledDate, (weeklyLoadsMap.get(scheduledDate) || 0) + 1);
+      dailyRevenueMap.set(chartDate, (dailyRevenueMap.get(chartDate) || 0) + revenue);
+      weeklyLoadsMap.set(chartDate, (weeklyLoadsMap.get(chartDate) || 0) + 1);
     });
 
     const last7Days = [];
