@@ -134,11 +134,16 @@ export default function DriversPage() {
               </div>
               <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
                 <div className="flex items-center justify-between text-gray-500">
-                  <span>Truck:</span> <span className="text-gray-900 font-bold">{driver.truck}</span>
+                  <span>Truck:</span> <span className="text-gray-900 font-bold">{driver.truck || '—'}</span>
                 </div>
+                {driver.trailer && (
+                  <div className="flex items-center justify-between text-gray-500">
+                    <span>Trailer:</span> <span className="text-gray-900 font-bold">{driver.trailer}</span>
+                  </div>
+                )}
                 {driver.vin && (
                   <div className="flex items-center justify-between text-gray-500">
-                    <span>VIN:</span> <span className="text-gray-900 font-bold">{driver.vin}</span>
+                    <span>VIN#:</span> <span className="text-gray-900 font-bold">{driver.vin}</span>
                   </div>
                 )}
                 {driver.cell && (
