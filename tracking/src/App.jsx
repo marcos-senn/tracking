@@ -15,8 +15,8 @@ function SignInPage() {
           routing="path"
           path="/login"
           signUpUrl="/sign-up"
-          forceRedirectUrl="/"
-          signInFallbackRedirectUrl="/"
+          // forceRedirectUrl y fallback no son estrictamente necesarios aquí 
+          // si los configuras en el .env, pero no estorban.
         />
       </div>
     </div>
@@ -31,8 +31,6 @@ function SignUpPage() {
           routing="path"
           path="/sign-up"
           signInUrl="/login"
-          forceRedirectUrl="/"
-          signUpFallbackRedirectUrl="/"
         />
       </div>
     </div>
@@ -44,8 +42,9 @@ export default function App() {
     <>
       <Toaster />
       <Routes>
-        <Route path="/login" element={<SignInPage />} />
-        <Route path="/sign-up" element={<SignUpPage />} />
+        {/* LA SOLUCIÓN ESTÁ AQUÍ: Añadimos '/*' para que Clerk pueda manejar las rutas de callback de Google */}
+        <Route path="/login/*" element={<SignInPage />} />
+        <Route path="/sign-up/*" element={<SignUpPage />} />
 
         <Route path="/*" element={
           <>
