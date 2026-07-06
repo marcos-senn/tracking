@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 
 const statusColors = {
   'Booked': 'bg-purple-100 text-purple-700',
@@ -26,6 +26,7 @@ function formatDateLocal(dateStr) {
 
 export default function LoadsPage() {
   const { getToken, userId } = useAuth();
+  const { user } = useUser();
   const [loads, setLoads] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +167,7 @@ export default function LoadsPage() {
           drivers={drivers} 
           onSaved={fetchData} 
           getToken={getToken}
+          user={user}
         />
       )}
 
@@ -204,16 +206,22 @@ export default function LoadsPage() {
 
 function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   const isOwner = load.userId === currentUserId;
+  const creatorLabel = load.createdByName || (isOwner ? 'Tú' : 'Usuario');
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 group hover:shadow-md hover:border-gray-300 transition-all duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap mb-3">
-            <span className="font-bold text-lg text-indigo-600">{load.driverName || 'Unassigned'}</span>
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[load.status || ''] || 'bg-gray-100 text-gray-700'}`}>
-              {load.status}
-            </span>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="font-bold text-lg text-indigo-600">{load.driverName || 'Unassigned'}</span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[load.status || ''] || 'bg-gray-100 text-gray-700'}`}>
+                {load.status}
+              </span>
+            </div>
+            <div className="text-xs font-medium text-gray-600 bg-gray-50 px-2.5 py-1 rounded-full whitespace-nowrap max-w-[180px] truncate" title={`Creado por ${creatorLabel}`}>
+              Creado por {creatorLabel}
+            </div>
           </div>
           
           <div className="flex items-center gap-2 text-base font-semibold text-gray-800 mb-3">
@@ -262,7 +270,7 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   );
 }
 
-function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
+function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
   const empty = {
     loadNumber: '', driverId: '', status: 'Booked', rate: '',
     puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
@@ -304,11 +312,17 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken }) {
       const token = await getToken();
       const method = load ? 'PUT' : 'POST';
       const url = load ? `${API_LOADS}/${load._id}` : API_LOADS;
+      const createdByName = user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || 'Unknown';
+      const payload = {
+        ...form,
+        createdByName,
+        createdByEmail: user?.primaryEmailAddress?.emailAddress || ''
+      };
       
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ data: form })
+        body: JSON.stringify({ data: payload })
       });
 
       if (!res.ok) throw new Error('Error al guardar');

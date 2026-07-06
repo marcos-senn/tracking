@@ -18,7 +18,9 @@ const loadSchema = new mongoose.Schema({
   docsCreated: { type: Boolean, default: false },
   googlePuEventId: { type: String },
   googleDelEventId: { type: String },
-  userId: { type: String } // <--- NUEVO CAMPO
+  userId: { type: String },
+  createdByName: { type: String },
+  createdByEmail: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Load', loadSchema);

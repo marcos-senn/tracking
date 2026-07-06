@@ -43,6 +43,7 @@ router.post('/', async (req, res) => {
     const data = req.body.data;
     const { userId } = getAuth(req);
     data.userId = userId;
+    data.createdByName = data.createdByName || (userId ? `User ${userId.slice(0, 8)}` : 'Unknown');
     
     const newLoad = new Load(data);
     const savedLoad = await newLoad.save();
