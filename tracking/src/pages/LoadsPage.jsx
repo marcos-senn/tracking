@@ -93,16 +93,32 @@ export default function LoadsPage() {
     if (!statusModal) return;
     try {
       const token = await getToken();
-      await fetch(`${API_LOADS}/${statusModal.id}`, {
+      const res = await fetch(`${API_LOADS}/${statusModal.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ data: { status: statusModal.status } })
       });
+      const updatedLoad = await res.json();
       
-      setLoads(prev => prev.filter(l => l._id !== statusModal.id));
-      toast.success(`Carga marcada como ${statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}`);
+      // Si es estado final (Delivered o Cancelled), eliminar de lista
+      if (statusModal.status === 'Delivered' || statusModal.status === 'Cancelled') {
+        setLoads(prev => prev.filter(l => l._id !== statusModal.id));
+        toast.success(`Carga marcada como ${statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}`);
+      } else {
+        // Si es estado intermedio (ej: En Route to DEL), actualizar la carga y refrescar datos
+        const driver = drivers.find(d => d._id === updatedLoad.driverId);
+        const updatedLoadWithName = { 
+          ...updatedLoad, 
+          driverName: driver ? driver.driver : 'Unassigned', 
+          truck: driver ? driver.truck : '—' 
+        };
+        setLoads(prev => prev.map(l => l._id === statusModal.id ? updatedLoadWithName : l));
+        toast.success(`Carga actualizada a ${statusModal.status}`);
+      }
+      
       setStatusModal(null);
     } catch (error) {
+      console.error('Error:', error);
       toast.error('Error al actualizar estado');
       setStatusModal(null);
     }
@@ -278,6 +294,8 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [statusConfirmModal, setStatusConfirmModal] = useState(null);
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   useEffect(() => {
     if (load) {
@@ -299,6 +317,25 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
       setForm(empty);
     }
   }, [load]);
+
+  const handleStatusChange = (newStatus) => {
+    // Si es una carga existente y el estado cambió, pedir confirmación
+    if (load && form.status !== newStatus) {
+      setStatusConfirmModal({ from: form.status, to: newStatus });
+      setPendingStatus(newStatus);
+    } else {
+      // Si es una carga nueva, cambiar directamente
+      setForm((f) => ({ ...f, status: newStatus }));
+    }
+  };
+
+  const confirmStatusChange = () => {
+    if (pendingStatus) {
+      setForm((f) => ({ ...f, status: pendingStatus }));
+    }
+    setStatusConfirmModal(null);
+    setPendingStatus(null);
+  };
 
   const handleSave = async () => {
     // Validaciones obligatorias
@@ -342,88 +379,107 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
   const labelClass = "text-sm font-medium text-gray-700";
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-6 text-gray-800">{load ? 'Edit Load' : 'Add Load'}</h2>
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Load # *</label>
-              <input required value={form.loadNumber} onChange={(e) => set('loadNumber', e.target.value)} className={inputClass} />
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-white rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <h2 className="text-xl font-bold mb-6 text-gray-800">{load ? 'Edit Load' : 'Add Load'}</h2>
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Load # *</label>
+                <input required value={form.loadNumber} onChange={(e) => set('loadNumber', e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Status</label>
+                <select value={form.status} onChange={(e) => handleStatusChange(e.target.value)} className={inputClass}>
+                  {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
+
             <div>
-              <label className={labelClass}>Status</label>
-              <select value={form.status} onChange={(e) => set('status', e.target.value)} className={inputClass}>
-                {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+              <label className={labelClass}>Driver *</label>
+              <select required value={form.driverId || 'none'} onChange={(e) => set('driverId', e.target.value === 'none' ? '' : e.target.value)} className={inputClass}>
+                <option value="none">— Select —</option>
+                {drivers.map((d) => <option key={d._id} value={d._id}>{d.driver} (Truck {d.truck})</option>)}
               </select>
             </div>
-          </div>
 
-          <div>
-            <label className={labelClass}>Driver *</label>
-            <select required value={form.driverId || 'none'} onChange={(e) => set('driverId', e.target.value === 'none' ? '' : e.target.value)} className={inputClass}>
-              <option value="none">— Select —</option>
-              {drivers.map((d) => <option key={d._id} value={d._id}>{d.driver} (Truck {d.truck})</option>)}
-            </select>
-          </div>
+            <div>
+              <label className={labelClass}>Rate ($) *</label>
+              <input required type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
+            </div>
 
-          <div>
-            <label className={labelClass}>Rate ($) *</label>
-            <input required type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
-          </div>
+            <div className="border-t pt-4">
+              <p className="text-sm font-bold text-purple-600 mb-3">Pickup Info</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>City</label>
+                  <input value={form.puCity} onChange={(e) => set('puCity', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Date</label>
+                  <input type="date" value={form.puDate} onChange={(e) => set('puDate', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Time From</label>
+                  <input type="time" value={form.puTimeFrom} onChange={(e) => set('puTimeFrom', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Time To</label>
+                  <input type="time" value={form.puTimeTo} onChange={(e) => set('puTimeTo', e.target.value)} className={inputClass} />
+                </div>
+              </div>
+            </div>
 
-          <div className="border-t pt-4">
-            <p className="text-sm font-bold text-purple-600 mb-3">Pickup Info</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>City</label>
-                <input value={form.puCity} onChange={(e) => set('puCity', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Date</label>
-                <input type="date" value={form.puDate} onChange={(e) => set('puDate', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Time From</label>
-                <input type="time" value={form.puTimeFrom} onChange={(e) => set('puTimeFrom', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Time To</label>
-                <input type="time" value={form.puTimeTo} onChange={(e) => set('puTimeTo', e.target.value)} className={inputClass} />
+            <div className="border-t pt-4">
+              <p className="text-sm font-bold text-red-600 mb-3">Delivery Info</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>City (Destination) *</label>
+                  <input required value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Date</label>
+                  <input type="date" value={form.delDate} onChange={(e) => set('delDate', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Time From</label>
+                  <input type="time" value={form.delTimeFrom} onChange={(e) => set('delTimeFrom', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Time To</label>
+                  <input type="time" value={form.delTimeTo} onChange={(e) => set('delTimeTo', e.target.value)} className={inputClass} />
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="border-t pt-4">
-            <p className="text-sm font-bold text-red-600 mb-3">Delivery Info</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>City (Destination) *</label>
-                <input required value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Date</label>
-                <input type="date" value={form.delDate} onChange={(e) => set('delDate', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Time From</label>
-                <input type="time" value={form.delTimeFrom} onChange={(e) => set('delTimeFrom', e.target.value)} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Time To</label>
-                <input type="time" value={form.delTimeTo} onChange={(e) => set('delTimeTo', e.target.value)} className={inputClass} />
-              </div>
-            </div>
+          
+          <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
+            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
-        </div>
-        
-        <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving ? 'Saving...' : 'Save'}
-          </button>
         </div>
       </div>
-    </div>
+
+      {statusConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => setStatusConfirmModal(null)}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-2 text-gray-800">Confirmar Cambio de Estado</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              ¿Cambiar estado de <strong>{statusConfirmModal.from}</strong> a <strong>{statusConfirmModal.to}</strong>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setStatusConfirmModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">Cancelar</button>
+              <button onClick={confirmStatusChange} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

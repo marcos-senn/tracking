@@ -151,6 +151,61 @@ router.put('/:id', async (req, res) => {
       await setting.save();
     }
 
+    // Actualizar eventos de Google Calendar basado en cambios de estado
+    if (oldStatus !== newStatus) {
+      // Si cambia a "En Route to DEL", significa que el pickup ya se hizo - eliminar evento de pickup
+      if (newStatus === 'En Route to DEL' && oldLoad.googlePuEventId) {
+        try {
+          await calendar.events.delete({ 
+            calendarId: process.env.GOOGLE_CALENDAR_ID, 
+            eventId: oldLoad.googlePuEventId 
+          });
+          updatedLoad.googlePuEventId = null;
+        } catch (err) {
+          console.warn('Error al eliminar evento de pickup:', err);
+        }
+      }
+
+      // Si cambia a "At Delivery", también eliminar evento de pickup si existe
+      if (newStatus === 'At Delivery' && oldLoad.googlePuEventId) {
+        try {
+          await calendar.events.delete({ 
+            calendarId: process.env.GOOGLE_CALENDAR_ID, 
+            eventId: oldLoad.googlePuEventId 
+          });
+          updatedLoad.googlePuEventId = null;
+        } catch (err) {
+          console.warn('Error al eliminar evento de pickup:', err);
+        }
+      }
+
+      // Si cambia a "Delivered" o "Cancelled", eliminar ambos eventos
+      if ((newStatus === 'Delivered' || newStatus === 'Cancelled')) {
+        if (oldLoad.googlePuEventId) {
+          try {
+            await calendar.events.delete({ 
+              calendarId: process.env.GOOGLE_CALENDAR_ID, 
+              eventId: oldLoad.googlePuEventId 
+            });
+            updatedLoad.googlePuEventId = null;
+          } catch (err) {
+            console.warn('Error al eliminar evento de pickup:', err);
+          }
+        }
+        if (oldLoad.googleDelEventId) {
+          try {
+            await calendar.events.delete({ 
+              calendarId: process.env.GOOGLE_CALENDAR_ID, 
+              eventId: oldLoad.googleDelEventId 
+            });
+            updatedLoad.googleDelEventId = null;
+          } catch (err) {
+            console.warn('Error al eliminar evento de delivery:', err);
+          }
+        }
+      }
+    }
+
     // Liberar conductor si la carga se completó o canceló
     const oldDriverId = oldLoad.driverId ? oldLoad.driverId.toString() : null;
     const newDriverId = updatedLoad.driverId ? updatedLoad.driverId.toString() : null;
@@ -174,6 +229,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    await updatedLoad.save();
     res.json(updatedLoad);
   } catch (error) {
     console.error('Error al actualizar:', error);

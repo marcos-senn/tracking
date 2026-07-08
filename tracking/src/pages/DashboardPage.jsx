@@ -40,36 +40,52 @@ export default function DashboardPage() {
   const [revenue, setRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    try {
+      const token = await getToken();
+      const [dRes, lRes, sRes] = await Promise.all([
+        fetch(`${API_BASE}/drivers`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/loads`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE}/settings`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      
+      const dData = await dRes.json();
+      const lData = await lRes.json();
+      const sData = await sRes.json();
+
+      const loadsWithNames = lData.loads.map(load => {
+        const driver = dData.drivers.find(d => d._id === load.driverId);
+        return { ...load, driverName: driver ? driver.driver : 'Unassigned', truck: driver ? driver.truck : '—' };
+      });
+
+      setDrivers(dData.drivers);
+      setLoads(loadsWithNames);
+      setRevenue(sData.totalRevenue || 0);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await getToken();
-        const [dRes, lRes, sRes] = await Promise.all([
-          fetch(`${API_BASE}/drivers`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE}/loads`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE}/settings`, { headers: { 'Authorization': `Bearer ${token}` } })
-        ]);
-        
-        const dData = await dRes.json();
-        const lData = await lRes.json();
-        const sData = await sRes.json();
-
-        const loadsWithNames = lData.loads.map(load => {
-          const driver = dData.drivers.find(d => d._id === load.driverId);
-          return { ...load, driverName: driver ? driver.driver : 'Unassigned', truck: driver ? driver.truck : '—' };
-        });
-
-        setDrivers(dData.drivers);
-        setLoads(loadsWithNames);
-        setRevenue(sData.totalRevenue || 0);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        setLoading(false);
+    fetchData();
+    
+    // Refresca datos cada 30 segundos para mantener el dashboard actualizado
+    const interval = setInterval(fetchData, 30000);
+    
+    // Refresca cuando la página vuelve a ser visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchData();
       }
     };
-
-    fetchData();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [getToken]);
 
   const handleResetRevenue = async () => {
