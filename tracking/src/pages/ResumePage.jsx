@@ -177,27 +177,53 @@ export default function ResumePage() {
 
 function TopDestinations({ destinations }) {
   const max = destinations.length > 0 ? destinations[0].count : 1;
+  const visibleDestinations = destinations.slice(0, 3);
+  const hiddenDestinations = destinations.slice(3);
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Destinations</h3>
       <div className="space-y-3">
         {destinations.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet</p>
-        ) : destinations.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 1}</span>
-            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between items-start mb-1 gap-2">
-                <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.city}</span>
-                <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+        ) : (
+          <>
+            {visibleDestinations.map((d, i) => (
+              <div key={`${d.city}-${i}`} className="flex items-center gap-3">
+                <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 1}</span>
+                <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1 gap-2">
+                    <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.city}</span>
+                    <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${(d.count / max) * 100}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full bg-blue-600" style={{ width: `${(d.count / max) * 100}%` }} />
+            ))}
+            {hiddenDestinations.length > 0 && (
+              <div className="max-h-36 overflow-y-auto pr-1 space-y-3">
+                {hiddenDestinations.map((d, i) => (
+                  <div key={`${d.city}-extra-${i}`} className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 4}</span>
+                    <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.city}</span>
+                        <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-blue-600" style={{ width: `${(d.count / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
-        ))}
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -205,27 +231,53 @@ function TopDestinations({ destinations }) {
 
 function TopDrivers({ drivers }) {
   const max = drivers.length > 0 ? drivers[0].count : 1;
+  const visibleDrivers = drivers.slice(0, 3);
+  const hiddenDrivers = drivers.slice(3);
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Drivers</h3>
       <div className="space-y-3">
         {drivers.length === 0 ? (
           <p className="text-sm text-gray-500">No data yet</p>
-        ) : drivers.map((d, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 1}</span>
-            <User className="h-4 w-4 text-gray-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex justify-between items-start mb-1 gap-2">
-                <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.driver}</span>
-                <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+        ) : (
+          <>
+            {visibleDrivers.map((d, i) => (
+              <div key={`${d.driver}-${i}`} className="flex items-center gap-3">
+                <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 1}</span>
+                <User className="h-4 w-4 text-gray-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1 gap-2">
+                    <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.driver}</span>
+                    <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(d.count / max) * 100}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(d.count / max) * 100}%` }} />
+            ))}
+            {hiddenDrivers.length > 0 && (
+              <div className="max-h-36 overflow-y-auto pr-1 space-y-3">
+                {hiddenDrivers.map((d, i) => (
+                  <div key={`${d.driver}-extra-${i}`} className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{i + 4}</span>
+                    <User className="h-4 w-4 text-gray-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <span className="text-sm font-medium text-gray-800 break-words min-w-0">{d.driver}</span>
+                        <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{d.count} {d.count === 1 ? 'load' : 'loads'}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(d.count / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
-        ))}
+            )}
+          </>
+        )}
       </div>
     </div>
   );

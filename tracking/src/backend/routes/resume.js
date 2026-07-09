@@ -54,24 +54,24 @@ router.get('/', async (req, res) => {
       weeklyLoadsMap.set(chartDate, (weeklyLoadsMap.get(chartDate) || 0) + 1);
     });
 
-    const last7Days = [];
+    const last14Days = [];
     const today = new Date();
 
-    for (let i = 6; i >= 0; i -= 1) {
+    for (let i = 13; i >= 0; i -= 1) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
       const yyyy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
       const dd = String(date.getDate()).padStart(2, '0');
-      last7Days.push(`${yyyy}-${mm}-${dd}`);
+      last14Days.push(`${yyyy}-${mm}-${dd}`);
     }
 
-    const dailyRevenue = last7Days.map((date) => ({
+    const dailyRevenue = last14Days.map((date) => ({
       date,
       revenue: dailyRevenueMap.get(date) || 0
     }));
 
-    const weeklyLoads = last7Days.map((week) => ({
+    const weeklyLoads = last14Days.map((week) => ({
       week,
       count: weeklyLoadsMap.get(week) || 0
     }));
