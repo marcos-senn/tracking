@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth, useUser } from '@clerk/clerk-react';
@@ -17,6 +17,7 @@ const statuses = ['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'A
 
 const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
 const API_DRIVERS = 'https://load-tracker-api-lfau.onrender.com/api/drivers';
+const API_BROKERS = 'https://load-tracker-api-lfau.onrender.com/api/brokers';
 
 function formatDateLocal(dateStr) {
   if (!dateStr) return '';
@@ -29,6 +30,7 @@ export default function LoadsPage() {
   const { user } = useUser();
   const [loads, setLoads] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [brokers, setBrokers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -40,12 +42,14 @@ export default function LoadsPage() {
   const fetchData = useCallback(async () => {
     try {
       const token = await getToken();
-      const [lRes, dRes] = await Promise.all([
+      const [lRes, dRes, bRes] = await Promise.all([
         fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(API_DRIVERS, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(API_BROKERS, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       const lData = await lRes.json();
       const dData = await dRes.json();
+      const bData = await bRes.json();
       
       const loadsWithNames = lData.loads.map(load => {
         const driver = dData.drivers.find(d => d._id === load.driverId);
@@ -56,6 +60,7 @@ export default function LoadsPage() {
 
       setLoads(activeLoads);
       setDrivers(dData.drivers);
+      setBrokers(bData.brokers || []);
       setLoading(false);
     } catch (error) {
       toast.error('Error al cargar datos');
@@ -69,7 +74,7 @@ export default function LoadsPage() {
     if (statusFilter !== 'all' && l.status !== statusFilter) return false;
     if (search) {
       const s = search.toLowerCase();
-      return l.loadNumber?.toLowerCase().includes(s) || l.driverName?.toLowerCase().includes(s) || l.puCity?.toLowerCase().includes(s) || l.delCity?.toLowerCase().includes(s);
+      return l.loadNumber?.toLowerCase().includes(s) || l.driverName?.toLowerCase().includes(s) || l.brokerName?.toLowerCase().includes(s) || l.puCity?.toLowerCase().includes(s) || l.delCity?.toLowerCase().includes(s);
     }
     return true;
   });
@@ -181,6 +186,7 @@ export default function LoadsPage() {
           onClose={() => setDialogOpen(false)} 
           load={editing} 
           drivers={drivers} 
+          brokers={brokers}
           onSaved={fetchData} 
           getToken={getToken}
           user={user}
@@ -249,6 +255,7 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-t border-gray-100 pt-3">
             <span className="text-gray-500">Load #: <span className="text-gray-900 font-bold">{load.loadNumber || '—'}</span></span>
+            <span className="text-gray-500">Broker: <span className="text-gray-900 font-bold">{load.brokerName || '—'}</span></span>
             <span className="text-gray-500">Truck: <span className="text-gray-900 font-bold">{load.truck || '—'}</span></span>
             <span className="text-gray-500">Rate: <span className="text-emerald-600 font-bold">${(load.rate || 0).toLocaleString()}</span></span>
             
@@ -286,9 +293,80 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   );
 }
 
-function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
+const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-autocomplete-script';
+
+function loadGoogleMapsScript(apiKey) {
+  if (typeof window === 'undefined' || !apiKey) return Promise.resolve(false);
+  if (window.google?.maps?.places) return Promise.resolve(true);
+  if (document.getElementById(GOOGLE_MAPS_SCRIPT_ID)) {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (window.google?.maps?.places) return resolve(true);
+        window.setTimeout(check, 100);
+      };
+      check();
+    });
+  }
+
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.id = GOOGLE_MAPS_SCRIPT_ID;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve(Boolean(window.google?.maps?.places));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
+
+function LocationAutocomplete({ value, onChange, placeholder, className }) {
+  const inputRef = useRef(null);
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const init = async () => {
+      const loaded = await loadGoogleMapsScript(apiKey);
+      if (cancelled || !inputRef.current || !loaded) return;
+      if (inputRef.current.dataset.autocompleteBound === 'true') return;
+
+      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ['geocode'],
+        fields: ['formatted_address', 'name']
+      });
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        const nextValue = place.formatted_address || place.name || inputRef.current?.value || '';
+        onChange(nextValue);
+      });
+
+      inputRef.current.dataset.autocompleteBound = 'true';
+    };
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiKey, onChange]);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      autoComplete="off"
+      className={className}
+    />
+  );
+}
+
+function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }) {
   const empty = {
-    loadNumber: '', driverId: '', status: 'Booked', rate: '',
+    loadNumber: '', driverId: '', brokerName: '', status: 'Booked', rate: '',
     puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
     delCity: '', delDate: '', delTimeFrom: '', delTimeTo: ''
   };
@@ -302,6 +380,7 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
       setForm({
         loadNumber: load.loadNumber || '',
         driverId: load.driverId || '',
+        brokerName: load.brokerName || '',
         status: load.status || 'Booked',
         rate: load.rate?.toString() || '',
         puCity: load.puCity || '',
@@ -406,6 +485,22 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
             </div>
 
             <div>
+              <label className={labelClass}>Broker</label>
+              <input
+                value={form.brokerName}
+                onChange={(e) => set('brokerName', e.target.value)}
+                list="broker-suggestions"
+                placeholder="Type or select a broker"
+                className={inputClass}
+              />
+              <datalist id="broker-suggestions">
+                {brokers.map((broker) => (
+                  <option key={broker._id} value={broker.name} />
+                ))}
+              </datalist>
+            </div>
+
+            <div>
               <label className={labelClass}>Rate ($) *</label>
               <input required type="number" value={form.rate} onChange={(e) => set('rate', e.target.value)} className={inputClass} />
             </div>
@@ -415,7 +510,12 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>City</label>
-                  <input value={form.puCity} onChange={(e) => set('puCity', e.target.value)} className={inputClass} />
+                  <LocationAutocomplete
+                    value={form.puCity}
+                    onChange={(value) => set('puCity', value)}
+                    placeholder="Start typing a city or address"
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Date</label>
@@ -437,7 +537,12 @@ function LoadDialog({ onClose, load, drivers, onSaved, getToken, user }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>City (Destination) *</label>
-                  <input required value={form.delCity} onChange={(e) => set('delCity', e.target.value)} className={inputClass} />
+                  <LocationAutocomplete
+                    value={form.delCity}
+                    onChange={(value) => set('delCity', value)}
+                    placeholder="Start typing a city or address"
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Date</label>

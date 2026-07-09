@@ -36,10 +36,29 @@ export default function DriversPage() {
 
   useEffect(() => { fetchDrivers(); }, []);
 
+  const normalizedSearch = search.trim().toLowerCase();
+
   const filtered = drivers.filter(d => {
     if (statusFilter !== 'all' && d.status !== statusFilter) return false;
-    if (search && !d.driver?.toLowerCase().includes(search.toLowerCase()) && !d.company?.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+    if (!normalizedSearch) return true;
+
+    const searchableValues = [
+      d.driver,
+      d.company,
+      d.truck,
+      d.trailer,
+      d.vin,
+      d.cell,
+      d.status,
+      d._id,
+    ];
+
+    const haystack = searchableValues
+      .filter(value => value !== null && value !== undefined && value !== '')
+      .map(value => String(value).toLowerCase())
+      .join(' ');
+
+    return haystack.includes(normalizedSearch);
   });
 
   const handleDelete = async () => {

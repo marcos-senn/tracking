@@ -163,6 +163,9 @@ export default function ResumePage() {
                       <span className="text-red-700 font-medium">DEL: {formatDateLocal(load.delDate)} {load.delTimeFrom || ''}</span>
                     )}
                   </div>
+                  {load.brokerName && (
+                    <div className="text-xs text-gray-500 mt-1">Broker: {load.brokerName}</div>
+                  )}
                   <div className="text-xs text-gray-400 mt-1">Rate: ${load.rate || 0}</div>
                 </div>
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${load.status === 'Delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>

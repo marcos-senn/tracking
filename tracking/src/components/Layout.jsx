@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Truck, Package, Menu, X, LogOut, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, Truck, Package, Menu, X, LogOut, BarChart2, BriefcaseBusiness } from 'lucide-react';
 import { useUser, useClerk } from '@clerk/clerk-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/drivers', label: 'Drivers', icon: Truck },
   { to: '/loads', label: 'Loads', icon: Package },
+  { to: '/brokers', label: 'Brokers', icon: BriefcaseBusiness },
   { to: '/resume', label: 'Resume', icon: BarChart2 },
 ];
 

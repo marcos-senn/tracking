@@ -4,6 +4,7 @@ const loadSchema = new mongoose.Schema({
   loadNumber: { type: String, required: true },
   driverId: { type: String },
   driverName: { type: String },
+  brokerName: { type: String },
   truck: { type: String },
   status: { type: String, default: 'Booked' },
   rate: { type: Number },

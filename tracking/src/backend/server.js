@@ -24,6 +24,7 @@ app.get('/api/health', (req, res) => {
 // Rutas de la API
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/loads', require('./routes/loads'));
+app.use('/api/brokers', require('./routes/brokers'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/resume', require('./routes/resume'));
 

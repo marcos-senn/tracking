@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
 import LoadsPage from './pages/LoadsPage';
+import BrokersPage from './pages/BrokersPage';
 import ResumePage from './pages/ResumePage';
 
 function SignInPage() {
@@ -47,6 +48,7 @@ export default function App() {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/drivers" element={<DriversPage />} />
                   <Route path="/loads" element={<LoadsPage />} />
+                  <Route path="/brokers" element={<BrokersPage />} />
                   <Route path="/resume" element={<ResumePage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
