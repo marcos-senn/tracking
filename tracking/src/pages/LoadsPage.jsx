@@ -353,7 +353,8 @@ function LocationAutocomplete({ value, onChange, placeholder, className }) {
 
       const autocomplete = new window.google.maps.places.PlaceAutocompleteElement({
         componentRestrictions: { country: ['us'] },
-        fields: ['displayName', 'formattedAddress']
+        includedPrimaryTypes: ['airport', 'locality', 'administrative_area_level_1', 'postal_code'],
+        language: 'en'
       });
 
       const input = document.createElement('input');
