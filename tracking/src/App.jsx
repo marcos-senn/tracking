@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { SignedIn, SignedOut, SignIn, SignUp } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, SignIn } from '@clerk/clerk-react';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import DriversPage from './pages/DriversPage';
@@ -14,23 +14,13 @@ function SignInPage() {
         <SignIn
           routing="path"
           path="/login"
-          signUpUrl="/sign-up"
-          // forceRedirectUrl y fallback no son estrictamente necesarios aquí 
-          // si los configuras en el .env, pero no estorban.
-        />
-      </div>
-    </div>
-  );
-}
-
-function SignUpPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-        <SignUp
-          routing="path"
-          path="/sign-up"
-          signInUrl="/login"
+          // Con esto ocultamos el botón de "Sign up" en la pantalla de login
+          appearance={{
+            elements: {
+              footerAction: { display: 'none' },
+              footerActionLink: { display: 'none' }
+            }
+          }}
         />
       </div>
     </div>
@@ -42,9 +32,8 @@ export default function App() {
     <>
       <Toaster />
       <Routes>
-        {/* LA SOLUCIÓN ESTÁ AQUÍ: Añadimos '/*' para que Clerk pueda manejar las rutas de callback de Google */}
+        {/* Mantenemos el '/*' aquí para que el login con Google no dé error 404 */}
         <Route path="/login/*" element={<SignInPage />} />
-        <Route path="/sign-up/*" element={<SignUpPage />} />
 
         <Route path="/*" element={
           <>
