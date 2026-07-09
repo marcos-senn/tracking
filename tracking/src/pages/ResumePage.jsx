@@ -10,7 +10,9 @@ const API_SETTINGS = 'https://load-tracker-api-lfau.onrender.com/api/settings';
 function formatDate(d) {
   if (!d) return '';
   const [y, m, day] = d.split('-').map(Number);
-  return `${day}/${m}`;
+  const date = new Date(y, m - 1, day);
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${weekday} ${day}/${m}`;
 }
 
 function formatDateLocal(dateStr) {

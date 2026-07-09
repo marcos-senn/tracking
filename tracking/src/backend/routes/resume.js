@@ -55,11 +55,11 @@ router.get('/', async (req, res) => {
     });
 
     const last14Days = [];
-    const today = new Date();
+    const startDate = new Date(2026, 6, 5);
 
-    for (let i = 13; i >= 0; i -= 1) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
+    for (let i = 0; i < 14; i += 1) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
       const yyyy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
       const dd = String(date.getDate()).padStart(2, '0');
