@@ -297,11 +297,11 @@ const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-autocomplete-script';
 
 function loadGoogleMapsScript(apiKey) {
   if (typeof window === 'undefined' || !apiKey) return Promise.resolve(false);
-  if (window.google?.maps?.places) return Promise.resolve(true);
+  if (window.google?.maps?.places?.PlaceAutocompleteElement) return Promise.resolve(true);
   if (document.getElementById(GOOGLE_MAPS_SCRIPT_ID)) {
     return new Promise((resolve) => {
       const check = () => {
-        if (window.google?.maps?.places) return resolve(true);
+        if (window.google?.maps?.places?.PlaceAutocompleteElement) return resolve(true);
         window.setTimeout(check, 100);
       };
       check();
@@ -311,56 +311,87 @@ function loadGoogleMapsScript(apiKey) {
   return new Promise((resolve) => {
     const script = document.createElement('script');
     script.id = GOOGLE_MAPS_SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve(Boolean(window.google?.maps?.places));
+    script.onload = () => resolve(Boolean(window.google?.maps?.places?.PlaceAutocompleteElement));
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
 }
 
 function LocationAutocomplete({ value, onChange, placeholder, className }) {
-  const inputRef = useRef(null);
+  const containerRef = useRef(null);
+  const [autocompleteError, setAutocompleteError] = useState('');
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
   useEffect(() => {
     let cancelled = false;
 
-    const init = async () => {
-      const loaded = await loadGoogleMapsScript(apiKey);
-      if (cancelled || !inputRef.current || !loaded) return;
-      if (inputRef.current.dataset.autocompleteBound === 'true') return;
+    const handleAuthFailure = () => {
+      if (!cancelled) {
+        setAutocompleteError('Google Places is unavailable. Check your API key, billing, and domain permissions.');
+      }
+    };
 
-      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ['geocode'],
-        fields: ['formatted_address', 'name']
+    window.gm_authFailure = handleAuthFailure;
+
+    const init = async () => {
+      setAutocompleteError('');
+      if (!apiKey) {
+        setAutocompleteError('Google Places is not configured yet.');
+        return;
+      }
+
+      const loaded = await loadGoogleMapsScript(apiKey);
+      if (cancelled || !containerRef.current || !loaded) {
+        handleAuthFailure();
+        return;
+      }
+
+      if (containerRef.current.dataset.autocompleteBound === 'true') return;
+
+      const autocomplete = new window.google.maps.places.PlaceAutocompleteElement({
+        componentRestrictions: { country: ['us'] },
+        fields: ['displayName', 'formattedAddress']
       });
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        const nextValue = place.formatted_address || place.name || inputRef.current?.value || '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = value;
+      input.placeholder = placeholder;
+      input.className = className;
+      input.autocomplete = 'off';
+      input.addEventListener('input', (event) => onChange(event.target.value));
+
+      autocomplete.addEventListener('gmp-select', (event) => {
+        const place = event.place;
+        const nextValue = place.formattedAddress || place.displayName || input.value || '';
         onChange(nextValue);
       });
 
-      inputRef.current.dataset.autocompleteBound = 'true';
+      containerRef.current.innerHTML = '';
+      containerRef.current.appendChild(input);
+      containerRef.current.appendChild(autocomplete);
+      containerRef.current.dataset.autocompleteBound = 'true';
     };
 
     init();
     return () => {
       cancelled = true;
+      if (window.gm_authFailure === handleAuthFailure) {
+        window.gm_authFailure = undefined;
+      }
     };
-  }, [apiKey, onChange]);
+  }, [apiKey, onChange, placeholder, className, value]);
 
   return (
-    <input
-      ref={inputRef}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      autoComplete="off"
-      className={className}
-    />
+    <div>
+      <div ref={containerRef} />
+      {autocompleteError && (
+        <p className="mt-1 text-xs text-amber-600">{autocompleteError}</p>
+      )}
+    </div>
   );
 }
 
