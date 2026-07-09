@@ -120,45 +120,54 @@ export default function DriversPage() {
       {filtered.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl py-16 text-center text-gray-500 shadow-sm">No drivers found</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-3">
           {filtered.map(driver => (
-            <div key={driver._id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 group hover:shadow-md hover:border-gray-300 transition-all duration-200">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-bold text-lg text-indigo-600">{driver.driver}</h3>
-                  <p className="text-sm text-gray-500">{driver.company}</p>
+            <div key={driver._id} className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3 group hover:shadow-md hover:border-gray-300 transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              
+              {/* Sección Izquierda: Nombre, Compañía y Estatus */}
+              <div className="flex items-center gap-4 min-w-0 sm:w-1/4">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base text-indigo-600 truncate">{driver.driver}</h3>
+                  <p className="text-xs text-gray-500 truncate">{driver.company}</p>
                 </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[driver.status || ''] || 'bg-gray-100 text-gray-700'}`}>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColors[driver.status || ''] || 'bg-gray-100 text-gray-700'}`}>
                   {driver.status}
                 </span>
               </div>
-              <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between text-gray-500">
-                  <span>Truck:</span> <span className="text-gray-900 font-bold">{driver.truck || '—'}</span>
+
+              {/* Sección Medio: Detalles del Camión */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-gray-600 flex-1 justify-start sm:justify-center">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-400 text-xs">Truck:</span>
+                  <span className="font-bold text-gray-800">{driver.truck || '—'}</span>
                 </div>
                 {driver.trailer && (
-                  <div className="flex items-center justify-between text-gray-500">
-                    <span>Trailer:</span> <span className="text-gray-900 font-bold">{driver.trailer}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-400 text-xs">Trailer:</span>
+                    <span className="font-bold text-gray-800">{driver.trailer}</span>
                   </div>
                 )}
                 {driver.vin && (
-                  <div className="flex items-center justify-between text-gray-500">
-                    <span>VIN#:</span> <span className="text-gray-900 font-bold">{driver.vin}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-400 text-xs">VIN:</span>
+                    <span className="font-bold text-gray-800">{driver.vin}</span>
                   </div>
                 )}
                 {driver.cell && (
-                  <div className="flex items-center gap-1.5 text-gray-500 pt-2">
+                  <div className="flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5 text-gray-400" />
                     <a href={`tel:${driver.cell}`} className="hover:underline text-blue-600 font-medium">{driver.cell}</a>
                   </div>
                 )}
               </div>
-              <div className="flex gap-2 mt-5">
-                <button onClick={() => { setEditing(driver); setDialogOpen(true); }} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
+
+              {/* Sección Derecha: Botones de Acción */}
+              <div className="flex items-center gap-2 justify-end">
+                <button onClick={() => { setEditing(driver); setDialogOpen(true); }} className="flex items-center justify-center h-8 w-8 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                  <Pencil className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => setDeleteId(driver._id)} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                <button onClick={() => setDeleteId(driver._id)} className="flex items-center justify-center h-8 w-8 border border-gray-300 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
