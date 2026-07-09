@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
-const { clerkMiddleware } = require('@clerk/express');
+const { clerkMiddleware, requireAuth } = require('@clerk/express');
 
 const app = express();
 
@@ -10,13 +10,18 @@ const app = express();
 app.use(cors({
   origin: ['https://tracking-4mmr.vercel.app', 'http://localhost:5173']
 }));
-app.use(express.json());
+app.use(express.json()); // Asegúrate de tener esto antes de las rutas
 app.use(clerkMiddleware({
   secretKey: process.env.CLERK_SECRET_KEY,
   publishableKey: process.env.CLERK_PUBLISHABLE_KEY
 }));
 
-// Rutas
+// Ruta de prueba para verificar que el servidor está vivo
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
+});
+
+// Rutas de la API
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/loads', require('./routes/loads'));
 app.use('/api/settings', require('./routes/settings'));
@@ -35,4 +40,4 @@ mongoose.connect(MONGO_URI)
   })
   .catch((error) => {
     console.error('❌ Error conectando a MongoDB:', error.message);
-  }); 
+  });

@@ -20,9 +20,7 @@ function ClerkApp() {
       routerPush={(to) => navigate(to)}
       routerReplace={(to) => navigate(to, { replace: true })}
       signInUrl="/login"
-      signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
     >
       <App />
     </ClerkProvider>
