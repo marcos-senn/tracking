@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth, useUser } from '@clerk/clerk-react';
@@ -291,110 +291,6 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   );
 }
 
-const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-autocomplete-script';
-
-function loadGoogleMapsScript(apiKey) {
-  if (typeof window === 'undefined' || !apiKey) return Promise.resolve(false);
-  if (window.google?.maps?.places?.PlaceAutocompleteElement) return Promise.resolve(true);
-  if (document.getElementById(GOOGLE_MAPS_SCRIPT_ID)) {
-    return new Promise((resolve) => {
-      const check = () => {
-        if (window.google?.maps?.places?.PlaceAutocompleteElement) return resolve(true);
-        window.setTimeout(check, 100);
-      };
-      check();
-    });
-  }
-
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.id = GOOGLE_MAPS_SCRIPT_ID;
-    // Se agregó &language=en para forzar el idioma en la nueva API
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&language=en`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve(Boolean(window.google?.maps?.places?.PlaceAutocompleteElement));
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
-}
-
-function LocationAutocomplete({ value, onChange, placeholder, className }) {
-  const containerRef = useRef(null);
-  const [autocompleteError, setAutocompleteError] = useState('');
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const handleAuthFailure = () => {
-      if (!cancelled) {
-        setAutocompleteError('Google Places is unavailable. Check your API key, billing, and domain permissions.');
-      }
-    };
-
-    window.gm_authFailure = handleAuthFailure;
-
-    const init = async () => {
-      setAutocompleteError('');
-      if (!apiKey) {
-        setAutocompleteError('Google Places is not configured yet.');
-        return;
-      }
-
-      const loaded = await loadGoogleMapsScript(apiKey);
-      if (cancelled || !containerRef.current || !loaded) {
-        handleAuthFailure();
-        return;
-      }
-
-      if (containerRef.current.dataset.autocompleteBound === 'true') return;
-
-      const autocomplete = new window.google.maps.places.PlaceAutocompleteElement({
-        componentRestrictions: { country: ['us'] },
-        includedPrimaryTypes: ['airport', 'locality', 'administrative_area_level_1', 'postal_code'],
-        // Se eliminó language: 'en' de aquí para evitar el InvalidValueError
-      });
-
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = value;
-      input.placeholder = placeholder;
-      input.className = className;
-      input.autocomplete = 'off';
-      input.addEventListener('input', (event) => onChange(event.target.value));
-
-      autocomplete.addEventListener('gmp-select', (event) => {
-        const place = event.place;
-        const nextValue = place.formattedAddress || place.displayName || input.value || '';
-        onChange(nextValue);
-      });
-
-      containerRef.current.innerHTML = '';
-      containerRef.current.appendChild(input);
-      containerRef.current.appendChild(autocomplete);
-      containerRef.current.dataset.autocompleteBound = 'true';
-    };
-
-    init();
-    return () => {
-      cancelled = true;
-      if (window.gm_authFailure === handleAuthFailure) {
-        window.gm_authFailure = undefined;
-      }
-    };
-  }, [apiKey, onChange, placeholder, className, value]);
-
-  return (
-    <div>
-      <div ref={containerRef} />
-      {autocompleteError && (
-        <p className="mt-1 text-xs text-amber-600">{autocompleteError}</p>
-      )}
-    </div>
-  );
-}
-
 function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }) {
   const empty = {
     loadNumber: '', driverId: '', brokerName: '', status: 'Booked', rate: '',
@@ -538,11 +434,12 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>City</label>
-                  <LocationAutocomplete
-                    value={form.puCity}
-                    onChange={(value) => set('puCity', value)}
-                    placeholder="Start typing a city or address"
-                    className={inputClass}
+                  <input 
+                    type="text" 
+                    value={form.puCity} 
+                    onChange={(e) => set('puCity', e.target.value)} 
+                    placeholder="Enter city or address"
+                    className={inputClass} 
                   />
                 </div>
                 <div>
@@ -565,11 +462,13 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>City (Destination) *</label>
-                  <LocationAutocomplete
-                    value={form.delCity}
-                    onChange={(value) => set('delCity', value)}
-                    placeholder="Start typing a city or address"
-                    className={inputClass}
+                  <input 
+                    type="text" 
+                    required
+                    value={form.delCity} 
+                    onChange={(e) => set('delCity', e.target.value)} 
+                    placeholder="Enter city or address"
+                    className={inputClass} 
                   />
                 </div>
                 <div>
