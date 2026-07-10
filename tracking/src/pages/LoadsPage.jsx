@@ -105,12 +105,10 @@ export default function LoadsPage() {
       });
       const updatedLoad = await res.json();
       
-      // Si es estado final (Delivered o Cancelled), eliminar de lista
       if (statusModal.status === 'Delivered' || statusModal.status === 'Cancelled') {
         setLoads(prev => prev.filter(l => l._id !== statusModal.id));
         toast.success(`Carga marcada como ${statusModal.status === 'Delivered' ? 'Completada' : 'Suspendida'}`);
       } else {
-        // Si es estado intermedio (ej: En Route to DEL), actualizar la carga y refrescar datos
         const driver = drivers.find(d => d._id === updatedLoad.driverId);
         const updatedLoadWithName = { 
           ...updatedLoad, 
@@ -311,7 +309,8 @@ function loadGoogleMapsScript(apiKey) {
   return new Promise((resolve) => {
     const script = document.createElement('script');
     script.id = GOOGLE_MAPS_SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+    // Se agregó &language=en para forzar el idioma en la nueva API
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&language=en`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve(Boolean(window.google?.maps?.places?.PlaceAutocompleteElement));
@@ -354,7 +353,7 @@ function LocationAutocomplete({ value, onChange, placeholder, className }) {
       const autocomplete = new window.google.maps.places.PlaceAutocompleteElement({
         componentRestrictions: { country: ['us'] },
         includedPrimaryTypes: ['airport', 'locality', 'administrative_area_level_1', 'postal_code'],
-        language: 'en'
+        // Se eliminó language: 'en' de aquí para evitar el InvalidValueError
       });
 
       const input = document.createElement('input');
@@ -430,12 +429,10 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }
   }, [load]);
 
   const handleStatusChange = (newStatus) => {
-    // Si es una carga existente y el estado cambió, pedir confirmación
     if (load && form.status !== newStatus) {
       setStatusConfirmModal({ from: form.status, to: newStatus });
       setPendingStatus(newStatus);
     } else {
-      // Si es una carga nueva, cambiar directamente
       setForm((f) => ({ ...f, status: newStatus }));
     }
   };
@@ -449,7 +446,6 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }
   };
 
   const handleSave = async () => {
-    // Validaciones obligatorias
     if (!form.loadNumber.trim()) { toast.error('Load # es obligatorio'); return; }
     if (!form.driverId) { toast.error('Driver es obligatorio'); return; }
     if (!form.rate.trim()) { toast.error('Rate es obligatorio'); return; }
