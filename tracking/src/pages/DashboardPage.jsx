@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Truck, Package, MapPin, DollarSign, CalendarCheck, CalendarClock, ArrowRight, RotateCcw } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'sonner';
@@ -145,6 +146,8 @@ export default function DashboardPage() {
     }
   });
 
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
@@ -221,7 +224,12 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500 text-center py-6">No hay eventos próximos.</p>
             ) : (
               upcomingEvents.map((load, index) => (
-                <div key={index} className="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                <div
+                  key={index}
+                  role="button"
+                  onClick={() => navigate(`/loads?loadId=${load._id}`)}
+                  className="cursor-pointer p-4 rounded-lg bg-gray-50 border border-gray-100 hover:bg-white hover:shadow-sm transition-all"
+                >
                   <div className="flex justify-between items-center mb-1">
                     <div className="font-bold text-sm text-indigo-600">{load.driverName}</div>
                     <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${load.type === 'PU' ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-700'}`}>

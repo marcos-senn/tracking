@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Plus, Pencil, Trash2, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth, useUser } from '@clerk/clerk-react';
@@ -28,6 +29,7 @@ function formatDateLocal(dateStr) {
 export default function LoadsPage() {
   const { getToken, userId } = useAuth();
   const { user } = useUser();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loads, setLoads] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [brokers, setBrokers] = useState([]);
@@ -38,6 +40,8 @@ export default function LoadsPage() {
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [statusModal, setStatusModal] = useState(null);
+  const [initialDriverId, setInitialDriverId] = useState('');
+  const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     try {
@@ -69,6 +73,27 @@ export default function LoadsPage() {
   }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const driverId = searchParams.get('driverId');
+    const loadId = searchParams.get('loadId');
+
+    if (driverId) {
+      setInitialDriverId(driverId);
+      setEditing(null);
+      setDialogOpen(true);
+      setSearchParams({});
+    }
+
+    if (loadId && loads.length > 0) {
+      const matched = loads.find((l) => l._id === loadId);
+      if (matched) {
+        setEditing(matched);
+        setDialogOpen(true);
+        setSearchParams({});
+      }
+    }
+  }, [loads, searchParams, setSearchParams]);
 
   const filtered = loads.filter((l) => {
     if (statusFilter !== 'all' && l.status !== statusFilter) return false;
@@ -181,13 +206,21 @@ export default function LoadsPage() {
 
       {dialogOpen && (
         <LoadDialog 
-          onClose={() => setDialogOpen(false)} 
+          onClose={() => {
+            setDialogOpen(false);
+            setEditing(null);
+            setInitialDriverId('');
+          }} 
           load={editing} 
           drivers={drivers} 
           brokers={brokers}
-          onSaved={fetchData} 
+          onSaved={() => {
+            fetchData();
+            setInitialDriverId('');
+          }} 
           getToken={getToken}
           user={user}
+          initialDriverId={initialDriverId}
         />
       )}
 
@@ -291,7 +324,7 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
   );
 }
 
-function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }) {
+function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user, initialDriverId }) {
   const empty = {
     loadNumber: '', driverId: '', brokerName: '', status: 'Booked', rate: '',
     puCity: '', puDate: '', puTimeFrom: '', puTimeTo: '',
@@ -319,10 +352,15 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user }
         delTimeFrom: load.delTimeFrom || '',
         delTimeTo: load.delTimeTo || ''
       });
+    } else if (initialDriverId) {
+      setForm({
+        ...empty,
+        driverId: initialDriverId
+      });
     } else {
       setForm(empty);
     }
-  }, [load]);
+  }, [load, initialDriverId]);
 
   const handleStatusChange = (newStatus) => {
     if (load && form.status !== newStatus) {

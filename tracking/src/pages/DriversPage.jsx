@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Pencil, Trash2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/clerk-react';
@@ -20,6 +21,8 @@ export default function DriversPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+
+  const navigate = useNavigate();
 
   const fetchDrivers = async () => {
     try {
@@ -182,6 +185,9 @@ export default function DriversPage() {
 
               {/* Sección Derecha: Botones de Acción */}
               <div className="flex items-center gap-2 justify-end">
+                <button onClick={() => navigate(`/loads?driverId=${driver._id}`)} className="flex items-center justify-center h-8 w-8 border border-gray-300 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors" title="Asignar carga">
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
                 <button onClick={() => { setEditing(driver); setDialogOpen(true); }} className="flex items-center justify-center h-8 w-8 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
