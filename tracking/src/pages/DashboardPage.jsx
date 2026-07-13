@@ -36,6 +36,7 @@ const normalizeDateValue = (value) => {
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
   const [drivers, setDrivers] = useState([]);
   const [loads, setLoads] = useState([]);
   const [revenue, setRevenue] = useState(0);
@@ -145,8 +146,6 @@ export default function DashboardPage() {
       upcomingEvents.push({ ...l, type: 'DEL', date: delDate, time: l.delTimeFrom, city: l.delCity });
     }
   });
-
-  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">
