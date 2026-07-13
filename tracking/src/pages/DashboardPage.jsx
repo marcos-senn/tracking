@@ -131,10 +131,13 @@ export default function DashboardPage() {
   
   const pickupsToday = activeLoadsList.filter(l => normalizeDateValue(l.puDate) === today);
   const deliveriesToday = activeLoadsList.filter(l => normalizeDateValue(l.delDate) === today);
+  const isPickupComplete = (load) => ['En Route to DEL', 'At Delivery', 'Delivered'].includes(load.status);
+  const hasPendingPickupToday = (load) => normalizeDateValue(load.puDate) === today && !isPickupComplete(load);
+  const hasDeliveryToday = (load) => normalizeDateValue(load.delDate) === today;
   
   const focusTodayIds = new Set();
   activeLoadsList.forEach(l => {
-    if (normalizeDateValue(l.puDate) === today || normalizeDateValue(l.delDate) === today) focusTodayIds.add(l._id);
+    if (hasPendingPickupToday(l) || hasDeliveryToday(l)) focusTodayIds.add(l._id);
   });
   const focusToday = activeLoadsList.filter(l => focusTodayIds.has(l._id));
   
@@ -196,12 +199,12 @@ export default function DashboardPage() {
                     <div className="font-bold text-base text-indigo-600">{load.driverName}</div>
                     <div className="text-xs text-gray-500 mb-2">Load #{load.loadNumber}</div>
                     <div className="text-xs text-gray-600 flex flex-col sm:flex-row sm:items-center sm:gap-4">
-                      {load.puDate === today && (
+                      {hasPendingPickupToday(load) && (
                         <span className="flex items-center gap-1 font-medium text-purple-700">
                           <ArrowRight className="h-3 w-3" /> PU: {load.puTimeFrom || '--:--'} - {load.puCity}
                         </span>
                       )}
-                      {load.delDate === today && (
+                      {hasDeliveryToday(load) && (
                         <span className="flex items-center gap-1 font-medium text-red-700">
                           <MapPin className="h-3 w-3" /> DEL: {load.delTimeFrom || '--:--'} - {load.delCity}
                         </span>
