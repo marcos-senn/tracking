@@ -123,6 +123,10 @@ export default function DashboardPage() {
   const dayAfter = getFormattedDate(2);
 
   const available = drivers.filter(d => d.status === 'Available').length;
+  const driversByStatus = [
+    ...drivers.filter(driver => driver.status !== 'Available'),
+    ...drivers.filter(driver => driver.status === 'Available'),
+  ];
   const activeLoadsList = loads.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
   
   const pickupsToday = activeLoadsList.filter(l => normalizeDateValue(l.puDate) === today);
@@ -286,7 +290,7 @@ export default function DashboardPage() {
             {drivers.length === 0 ? (
               <p className="text-sm text-gray-500">No drivers found</p>
             ) : (
-              drivers.map(driver => (
+              driversByStatus.map(driver => (
                 <div key={driver._id} className="flex items-center justify-between p-4 rounded-lg bg-gray-50 border border-gray-100">
                   <div>
                     <div className="font-bold text-sm text-indigo-600">{driver.driver}</div>
