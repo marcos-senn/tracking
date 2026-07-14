@@ -22,6 +22,22 @@ router.get('/', async (req, res) => {
       { $project: { _id: 0, city: '$_id', count: 1 } }
     ]);
 
+    // Brokers normalizados para que el uso de mayúsculas no genere duplicados.
+    const topBrokers = await Load.aggregate([
+      {
+        $project: {
+          normalizedBroker: {
+            $toUpper: { $trim: { input: { $ifNull: ['$brokerName', ''] } } }
+          }
+        }
+      },
+      { $match: { normalizedBroker: { $nin: ['', 'UNASSIGNED'] } } },
+      { $group: { _id: '$normalizedBroker', count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: 5 },
+      { $project: { _id: 0, broker: '$_id', count: 1 } }
+    ]);
+
     // 2. Top Conductores
     const topDriversRaw = await Load.aggregate([
       { $match: { driverId: { $nin: [null, ""] } } },
@@ -139,6 +155,7 @@ router.get('/', async (req, res) => {
 
     res.json({ 
       topDestinations, 
+      topBrokers,
       topDrivers, 
       userRevenueRanking,
       dailyRevenue, 

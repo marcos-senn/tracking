@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapPin, User, RotateCcw } from 'lucide-react';
+import { MapPin, User, RotateCcw, BriefcaseBusiness } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -97,9 +97,10 @@ export default function ResumePage() {
 
       <UserRevenueRanking users={data.userRevenueRanking || []} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <TopDestinations destinations={data.topDestinations} />
         <TopDrivers drivers={data.topDrivers} />
+        <TopBrokers brokers={data.topBrokers || []} />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
@@ -300,6 +301,48 @@ function TopDrivers({ drivers }) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TopBrokers({ brokers }) {
+  const max = brokers.length > 0 ? brokers[0].count : 1;
+  const visibleBrokers = brokers.slice(0, 3);
+  const hiddenBrokers = brokers.slice(3);
+
+  const brokerRow = (broker, index) => (
+    <div key={`${broker.broker}-${index}`} className="flex items-center gap-3">
+      <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{index + 1}</span>
+      <BriefcaseBusiness className="h-4 w-4 text-gray-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-start mb-1 gap-2">
+          <span className="text-sm font-medium text-gray-800 break-words min-w-0">{broker.broker}</span>
+          <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">{broker.count} {broker.count === 1 ? 'load' : 'loads'}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full rounded-full bg-violet-600" style={{ width: `${(broker.count / max) * 100}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Brokers</h3>
+      <div className="space-y-3">
+        {brokers.length === 0 ? (
+          <p className="text-sm text-gray-500">No data yet</p>
+        ) : (
+          <>
+            {visibleBrokers.map(brokerRow)}
+            {hiddenBrokers.length > 0 && (
+              <div className="max-h-36 overflow-y-auto pr-1 space-y-3">
+                {hiddenBrokers.map((broker, index) => brokerRow(broker, index + 3))}
               </div>
             )}
           </>
