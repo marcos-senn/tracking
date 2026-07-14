@@ -403,9 +403,13 @@ function LoadDialog({ onClose, load, drivers, brokers, onSaved, getToken, user, 
         body: JSON.stringify({ data: payload })
       });
 
-      if (!res.ok) throw new Error('Error al guardar');
+      const savedLoad = await res.json();
+      if (!res.ok) throw new Error(savedLoad.message || 'Error al guardar');
 
       toast.success(load ? 'Load updated' : 'Load created');
+      if (savedLoad.calendarWarnings?.length) {
+        toast.warning(`Carga guardada, pero Calendar no se sincronizó: ${savedLoad.calendarWarnings.join(' · ')}`);
+      }
       setSaving(false);
       onClose();
       onSaved();

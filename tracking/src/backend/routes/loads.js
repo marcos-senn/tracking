@@ -19,12 +19,34 @@ oauth2Client.setCredentials({
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-function getEndTime(startTime) {
-  if (!startTime) return '09:00';
-  const [h, m] = startTime.split(':').map(Number);
-  let newH = h + 1;
-  if (newH >= 24) newH = 23;
-  return `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+const calendarConfigKeys = [
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REFRESH_TOKEN',
+  'GOOGLE_CALENDAR_ID'
+];
+
+function getCalendarErrorMessage(error) {
+  return error.response?.data?.error?.message || error.message || 'Error desconocido de Google Calendar';
+}
+
+async function createCalendarEvent(resource, label) {
+  const missingConfig = calendarConfigKeys.filter((key) => !process.env[key]);
+  if (missingConfig.length > 0) {
+    return { warning: `${label}: faltan variables de Google Calendar (${missingConfig.join(', ')})` };
+  }
+
+  try {
+    const response = await calendar.events.insert({
+      calendarId: process.env.GOOGLE_CALENDAR_ID,
+      resource
+    });
+    return { eventId: response.data.id };
+  } catch (error) {
+    const message = getCalendarErrorMessage(error);
+    console.error(`Error al crear evento ${label}:`, message);
+    return { warning: `${label}: ${message}` };
+  }
 }
 
 // Obtener todas las cargas
@@ -59,8 +81,8 @@ router.post('/', async (req, res) => {
     if (data.driverId) {
       const driver = await Driver.findById(data.driverId);
       if (driver) {
-        data.driverName = driver.driver;
-        data.truck = driver.truck;
+        savedLoad.driverName = driver.driver;
+        savedLoad.truck = driver.truck;
         if (['Booked', 'En Route to PU', 'At Pickup', 'En Route to DEL', 'At Delivery'].includes(data.status)) {
           driver.status = 'En Route';
           await driver.save();
@@ -68,48 +90,45 @@ router.post('/', async (req, res) => {
       }
     }
 
+    const calendarWarnings = [];
     if (data.puDate) {
       const puEvent = buildCalendarEventPayload({
         type: 'PU',
         loadNumber: data.loadNumber,
-        driverName: data.driverName,
+        driverName: savedLoad.driverName,
         city: data.puCity,
         date: data.puDate,
         timeFrom: data.puTimeFrom,
         timeTo: data.puTimeTo,
-        truck: data.truck,
+        truck: savedLoad.truck,
         rate: data.rate,
       });
 
-      const puResponse = await calendar.events.insert({
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
-        resource: puEvent,
-      });
-      savedLoad.googlePuEventId = puResponse.data.id;
+      const result = await createCalendarEvent(puEvent, 'Evento de pickup');
+      if (result.eventId) savedLoad.googlePuEventId = result.eventId;
+      if (result.warning) calendarWarnings.push(result.warning);
     }
 
     if (data.delDate) {
       const delEvent = buildCalendarEventPayload({
         type: 'DEL',
         loadNumber: data.loadNumber,
-        driverName: data.driverName,
+        driverName: savedLoad.driverName,
         city: data.delCity,
         date: data.delDate,
         timeFrom: data.delTimeFrom,
         timeTo: data.delTimeTo,
-        truck: data.truck,
+        truck: savedLoad.truck,
         rate: data.rate,
       });
 
-      const delResponse = await calendar.events.insert({
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
-        resource: delEvent,
-      });
-      savedLoad.googleDelEventId = delResponse.data.id;
+      const result = await createCalendarEvent(delEvent, 'Evento de delivery');
+      if (result.eventId) savedLoad.googleDelEventId = result.eventId;
+      if (result.warning) calendarWarnings.push(result.warning);
     }
 
     await savedLoad.save();
-    res.status(201).json(savedLoad);
+    res.status(201).json({ ...savedLoad.toObject(), calendarWarnings });
   } catch (error) {
     console.error('Error al crear carga/evento:', error);
     res.status(400).json({ message: 'Error al crear carga' });
