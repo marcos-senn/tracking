@@ -25,6 +25,7 @@ export default function ResumePage() {
   const { getToken } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [historyDriverFilter, setHistoryDriverFilter] = useState('all');
 
   const fetchData = async () => {
     try {
@@ -62,6 +63,12 @@ export default function ResumePage() {
   if (loading) return <LoadingSkeleton />;
   if (!data) return null;
 
+  const historyDrivers = [...new Set(data.history.map((load) => load.driverName).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const filteredHistory = historyDriverFilter === 'all'
+    ? data.history
+    : data.history.filter((load) => load.driverName === historyDriverFilter);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-800">Resume</h1>
@@ -88,10 +95,11 @@ export default function ResumePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <UserRevenueRanking users={data.userRevenueRanking || []} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TopDestinations destinations={data.topDestinations} />
         <TopDrivers drivers={data.topDrivers} />
-        <UserRevenueRanking users={data.userRevenueRanking || []} />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
@@ -142,12 +150,24 @@ export default function ResumePage() {
 
       {/* HISTORIAL DE CARGAS CON SCROLL */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Historial de Cargas</h3>
-        {data.history.length === 0 ? (
-          <p className="text-sm text-gray-500 py-8 text-center">No hay cargas en el historial todavía.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Historial de Cargas</h3>
+          <select
+            value={historyDriverFilter}
+            onChange={(event) => setHistoryDriverFilter(event.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">Todos los conductores</option>
+            {historyDrivers.map((driver) => <option key={driver} value={driver}>{driver}</option>)}
+          </select>
+        </div>
+        {filteredHistory.length === 0 ? (
+          <p className="text-sm text-gray-500 py-8 text-center">
+            {historyDriverFilter === 'all' ? 'No hay cargas en el historial todavía.' : 'No hay cargas para este conductor.'}
+          </p>
         ) : (
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-            {data.history.map(load => (
+            {filteredHistory.map(load => (
               <div key={load._id} className="p-4 rounded-lg border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-bold text-sm text-gray-800 break-words">#{load.loadNumber} - {load.driverName}</div>
@@ -294,7 +314,7 @@ function UserRevenueRanking({ users }) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-      <h3 className="text-lg font-semibold text-gray-800 mb-1">Revenue por Usuario</h3>
+      <h3 className="text-lg font-semibold text-gray-800 mb-1">Ranking de Revenue Mensual</h3>
       <p className="text-xs text-gray-500 mb-4">Solo cargas completadas</p>
       <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
         {users.length === 0 ? (

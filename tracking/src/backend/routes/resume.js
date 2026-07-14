@@ -8,11 +8,18 @@ router.get('/', async (req, res) => {
   try {
     // 1. Top Destinos
     const topDestinations = await Load.aggregate([
-      { $match: { delCity: { $nin: [null, "", "Unassigned"] } } },
-      { $group: { _id: "$delCity", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
+      {
+        $project: {
+          normalizedCity: {
+            $toUpper: { $trim: { input: { $ifNull: ['$delCity', ''] } } }
+          }
+        }
+      },
+      { $match: { normalizedCity: { $nin: ['', 'UNASSIGNED'] } } },
+      { $group: { _id: '$normalizedCity', count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } },
       { $limit: 5 },
-      { $project: { _id: 0, city: "$_id", count: 1 } }
+      { $project: { _id: 0, city: '$_id', count: 1 } }
     ]);
 
     // 2. Top Conductores
@@ -33,14 +40,44 @@ router.get('/', async (req, res) => {
     const userRevenueRanking = await Load.aggregate([
       { $match: { status: 'Delivered', userId: { $nin: [null, ''] } } },
       {
+        $set: {
+          creatorName: { $ifNull: ['$createdByName', ''] }
+        }
+      },
+      {
+        $set: {
+          hasNamedCreator: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ['$creatorName', ''] },
+                  { $not: [{ $regexMatch: { input: '$creatorName', regex: /^User / } }] }
+                ]
+              },
+              1,
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { hasNamedCreator: -1, updatedAt: -1 } },
+      {
         $group: {
           _id: '$userId',
-          userName: { $first: { $ifNull: ['$createdByName', 'Unknown'] } },
+          userName: { $first: '$creatorName' },
           revenue: { $sum: { $ifNull: ['$rate', 0] } },
           completedLoads: { $sum: 1 }
         }
       },
-      { $project: { _id: 0, userId: '$_id', userName: 1, revenue: 1, completedLoads: 1 } },
+      {
+        $project: {
+          _id: 0,
+          userId: '$_id',
+          userName: { $cond: [{ $ne: ['$userName', ''] }, '$userName', 'Unknown'] },
+          revenue: 1,
+          completedLoads: 1
+        }
+      },
       { $sort: { revenue: -1, userName: 1 } }
     ]);
 

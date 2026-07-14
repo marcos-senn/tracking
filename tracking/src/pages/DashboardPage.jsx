@@ -123,10 +123,10 @@ export default function DashboardPage() {
   const dayAfter = getFormattedDate(2);
 
   const available = drivers.filter(d => d.status === 'Available').length;
-  const driversByStatus = [
-    ...drivers.filter(driver => driver.status !== 'Available'),
-    ...drivers.filter(driver => driver.status === 'Available'),
-  ];
+  const driversByStatus = [...drivers].sort((a, b) => {
+    const statusOrder = { 'En Route': 0, Available: 1 };
+    return (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2);
+  });
   const activeLoadsList = loads.filter(l => l.status !== 'Delivered' && l.status !== 'Cancelled');
   
   const pickupsToday = activeLoadsList.filter(l => normalizeDateValue(l.puDate) === today);
