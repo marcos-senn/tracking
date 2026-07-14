@@ -88,9 +88,10 @@ export default function ResumePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <TopDestinations destinations={data.topDestinations} />
         <TopDrivers drivers={data.topDrivers} />
+        <UserRevenueRanking users={data.userRevenueRanking || []} />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
@@ -282,6 +283,39 @@ function TopDrivers({ drivers }) {
               </div>
             )}
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UserRevenueRanking({ users }) {
+  const maxRevenue = users.length > 0 ? users[0].revenue : 1;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+      <h3 className="text-lg font-semibold text-gray-800 mb-1">Revenue por Usuario</h3>
+      <p className="text-xs text-gray-500 mb-4">Solo cargas completadas</p>
+      <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+        {users.length === 0 ? (
+          <p className="text-sm text-gray-500">No revenue data yet</p>
+        ) : (
+          users.map((user, index) => (
+            <div key={user.userId} className="flex items-center gap-3">
+              <span className="text-xs font-medium text-gray-500 w-5 text-right shrink-0">{index + 1}</span>
+              <User className="h-4 w-4 text-gray-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <span className="text-sm font-medium text-gray-800 break-words min-w-0">{user.userName}</span>
+                  <span className="text-xs text-emerald-700 font-semibold shrink-0 whitespace-nowrap">${user.revenue.toLocaleString()}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${(user.revenue / maxRevenue) * 100}%` }} />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{user.completedLoads} {user.completedLoads === 1 ? 'load completed' : 'loads completed'}</p>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

@@ -29,6 +29,21 @@ router.get('/', async (req, res) => {
       if (driver) topDrivers.push({ driver: driver.driver, count: item.count });
     }
 
+    // Revenue por usuario: solo se acredita una vez que la carga fue completada.
+    const userRevenueRanking = await Load.aggregate([
+      { $match: { status: 'Delivered', userId: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: '$userId',
+          userName: { $first: { $ifNull: ['$createdByName', 'Unknown'] } },
+          revenue: { $sum: { $ifNull: ['$rate', 0] } },
+          completedLoads: { $sum: 1 }
+        }
+      },
+      { $project: { _id: 0, userId: '$_id', userName: 1, revenue: 1, completedLoads: 1 } },
+      { $sort: { revenue: -1, userName: 1 } }
+    ]);
+
     // 3. Ingresos Diarios y cargas semanales por fecha de carga
     const loadsForCharts = await Load.find({}).select('createdAt rate');
 
@@ -88,6 +103,7 @@ router.get('/', async (req, res) => {
     res.json({ 
       topDestinations, 
       topDrivers, 
+      userRevenueRanking,
       dailyRevenue, 
       weeklyLoads, 
       history, 

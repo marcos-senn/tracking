@@ -48,10 +48,11 @@ router.post('/', async (req, res) => {
     const newLoad = new Load(data);
     const savedLoad = await newLoad.save();
 
-    if (data.rate) {
+    // Una carga creada ya como completada también cuenta como revenue.
+    if (savedLoad.status === 'Delivered' && savedLoad.rate) {
       let setting = await Setting.findOne();
       if (!setting) setting = await Setting.create({ totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 });
-      setting.totalRevenue += Number(data.rate);
+      setting.totalRevenue += Number(savedLoad.rate);
       await setting.save();
     }
 
@@ -126,18 +127,27 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ message: 'No tienes permiso para editar esta carga' });
     }
 
-    const updatedLoad = await Load.findByIdAndUpdate(req.params.id, req.body.data, { returnDocument: 'after' });
+    const updateData = { ...req.body.data };
+    // El creador de la carga no cambia al editarla: su revenue debe seguir
+    // acreditándose al usuario que la creó.
+    delete updateData.userId;
+    delete updateData.createdByName;
+    delete updateData.createdByEmail;
 
-    // Lógica de Revenue
+    const updatedLoad = await Load.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
+
+    // El revenue solo incluye cargas completadas (Delivered).
     const oldRate = oldLoad.rate || 0;
     const newRate = updatedLoad.rate || 0;
-    if (oldRate !== newRate) {
+    const oldWasCompleted = oldLoad.status === 'Delivered';
+    const isCompleted = updatedLoad.status === 'Delivered';
+    const revenueChange = (isCompleted ? newRate : 0) - (oldWasCompleted ? oldRate : 0);
+    if (revenueChange !== 0) {
       let setting = await Setting.findOne();
-      if (setting) {
-        setting.totalRevenue += (newRate - oldRate);
-        if (setting.totalRevenue < 0) setting.totalRevenue = 0;
-        await setting.save();
-      }
+      if (!setting) setting = await Setting.create({ totalRevenue: 0, completedLoads: 0, suspendedLoads: 0 });
+      setting.totalRevenue += revenueChange;
+      if (setting.totalRevenue < 0) setting.totalRevenue = 0;
+      await setting.save();
     }
 
     // Lógica de Contadores de Historial
@@ -248,7 +258,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ message: 'No tienes permiso para eliminar esta carga' });
     }
 
-    if (load.rate) {
+    if (load.status === 'Delivered' && load.rate) {
       let setting = await Setting.findOne();
       if (setting) {
         setting.totalRevenue -= Number(load.rate);
