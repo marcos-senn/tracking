@@ -19,10 +19,10 @@ export default function Layout({ children }) {
       
       {/* SIDEBAR PARA ESCRITORIO (Oculto en móvil) */}
       <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-gray-200">
-        <div className="flex items-center gap-2 px-5 py-5 border-b border-gray-200">
+        <NavLink to="/" className="flex items-center gap-2 px-5 py-5 border-b border-gray-200 hover:bg-gray-50 transition-colors">
           <Truck className="h-6 w-6 text-blue-600" />
           <span className="font-bold text-lg text-gray-800">Load Tracker</span>
-        </div>
+        </NavLink>
         <nav className="flex-1 py-3 px-3 space-y-1">
           {navItems.map(item => (
             <NavLink
@@ -60,10 +60,10 @@ export default function Layout({ children }) {
         
         {/* HEADER SUPERIOR PARA MÓVIL (Oculto en escritorio) */}
         <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 lg:hidden shrink-0">
-          <div className="flex items-center gap-2">
+          <NavLink to="/" className="flex items-center gap-2 rounded-md hover:bg-gray-50 transition-colors">
             <Truck className="h-6 w-6 text-blue-600" />
             <span className="font-bold text-lg text-gray-800">Load Tracker</span>
-          </div>
+          </NavLink>
           <button
             onClick={() => signOut({ redirectUrl: '/' })}
             className="p-2 text-gray-500 hover:bg-gray-100 rounded-md"
