@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { MapPin, User, RotateCcw, BriefcaseBusiness } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'sonner';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const API_URL = 'https://load-tracker-api-lfau.onrender.com/api/resume';
 const API_SETTINGS = 'https://load-tracker-api-lfau.onrender.com/api/settings';
@@ -68,6 +68,10 @@ export default function ResumePage() {
   const filteredHistory = historyDriverFilter === 'all'
     ? data.history
     : data.history.filter((load) => load.driverName === historyDriverFilter);
+  const revenueDays = data.dailyRevenue.filter((day) => day.revenue > 0);
+  const averageDailyRevenue = revenueDays.length > 0
+    ? revenueDays.reduce((total, day) => total + day.revenue, 0) / revenueDays.length
+    : null;
 
   return (
     <div className="space-y-6">
@@ -104,7 +108,12 @@ export default function ResumePage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Daily Revenue</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">Daily Revenue</h3>
+          {averageDailyRevenue !== null && (
+            <p className="text-sm font-medium text-amber-700">Promedio por día con cargas: ${averageDailyRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          )}
+        </div>
         {data.dailyRevenue.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No revenue data yet</p>
         ) : (
@@ -119,6 +128,14 @@ export default function ResumePage() {
                   formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
                   labelFormatter={formatDate}
                 />
+                {averageDailyRevenue !== null && (
+                  <ReferenceLine
+                    y={averageDailyRevenue}
+                    stroke="#d97706"
+                    strokeDasharray="6 4"
+                    strokeWidth={2}
+                  />
+                )}
                 <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }} />
               </LineChart>
             </ResponsiveContainer>
