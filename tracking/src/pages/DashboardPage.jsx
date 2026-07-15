@@ -153,6 +153,10 @@ export default function DashboardPage() {
       upcomingEvents.push({ ...l, type: 'DEL', date: delDate, time: l.delTimeFrom, city: l.delCity });
     }
   });
+  upcomingEvents.sort((a, b) => (
+    a.date.localeCompare(b.date)
+    || (a.time || '23:59').localeCompare(b.time || '23:59')
+  ));
 
   return (
     <div className="space-y-6">
