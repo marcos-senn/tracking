@@ -43,6 +43,9 @@ export default function LoadsPage() {
   const [initialDriverId, setInitialDriverId] = useState('');
   const navigate = useNavigate();
 
+  // Verificamos si el usuario actual es admin (por username o por rol en Clerk)
+  const isAdmin = user?.username === 'admin' || user?.publicMetadata?.role === 'admin';
+
   const fetchData = useCallback(async () => {
     try {
       const token = await getToken();
@@ -196,6 +199,7 @@ export default function LoadsPage() {
               key={load._id} 
               load={load} 
               currentUserId={userId} 
+              isAdmin={isAdmin} // Pasamos la bandera de admin al componente
               onEdit={() => { setEditing(load); setDialogOpen(true); }} 
               onDelete={() => setDeleteId(load._id)}
               onStatusChange={(status) => setStatusModal({ id: load._id, status })}
@@ -257,8 +261,10 @@ export default function LoadsPage() {
   );
 }
 
-function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
+function LoadCard({ load, currentUserId, isAdmin, onEdit, onDelete, onStatusChange }) {
   const isOwner = load.userId === currentUserId;
+  // El usuario puede editar si es el dueño O si es administrador
+  const canEdit = isOwner || isAdmin;
   const creatorLabel = load.createdByName || (isOwner ? 'Tú' : 'Usuario');
 
   return (
@@ -303,7 +309,8 @@ function LoadCard({ load, currentUserId, onEdit, onDelete, onStatusChange }) {
           </div>
         </div>
 
-        {isOwner && (
+        {/* Aquí cambiamos la condición para usar canEdit */}
+        {canEdit && (
           <div className="flex flex-wrap gap-2 transition-opacity shrink-0">
             <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors" title="Editar">
               <Pencil className="h-4 w-4" />

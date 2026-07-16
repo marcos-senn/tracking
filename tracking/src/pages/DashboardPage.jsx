@@ -201,7 +201,10 @@ export default function DashboardPage() {
                 <div key={load._id} className="flex items-center justify-between p-4 rounded-lg bg-red-50 border border-red-100">
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-base text-indigo-600">{load.driverName}</div>
-                    <div className="text-xs text-gray-500 mb-2">Load #{load.loadNumber}</div>
+                    {/* AQUÍ ESTÁ EL CAMBIO: Se agregó el Truck al lado del Load # */}
+                    <div className="text-xs text-gray-500 mb-2">
+                      Load #{load.loadNumber} <span className="text-gray-300 mx-1">|</span> Truck: {load.truck || '—'}
+                    </div>
                     <div className="text-xs text-gray-600 flex flex-col sm:flex-row sm:items-center sm:gap-4">
                       {hasPendingPickupToday(load) && (
                         <span className="flex items-center gap-1 font-medium text-purple-700">
