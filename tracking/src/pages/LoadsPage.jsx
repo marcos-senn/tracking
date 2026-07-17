@@ -26,6 +26,12 @@ function formatDateLocal(dateStr) {
   return new Date(year, month - 1, day).toLocaleDateString();
 }
 
+// Nueva función: Si hay 'to', muestra la franja. Si no, muestra solo 'from'.
+function formatTimeWindow(from, to) {
+  if (from && to) return `${from} - ${to}`;
+  return from || '';
+}
+
 export default function LoadsPage() {
   const { getToken, userId } = useAuth();
   const { user } = useUser();
@@ -199,7 +205,7 @@ export default function LoadsPage() {
               key={load._id} 
               load={load} 
               currentUserId={userId} 
-              isAdmin={isAdmin} // Pasamos la bandera de admin al componente
+              isAdmin={isAdmin} 
               onEdit={() => { setEditing(load); setDialogOpen(true); }} 
               onDelete={() => setDeleteId(load._id)}
               onStatusChange={(status) => setStatusModal({ id: load._id, status })}
@@ -263,9 +269,12 @@ export default function LoadsPage() {
 
 function LoadCard({ load, currentUserId, isAdmin, onEdit, onDelete, onStatusChange }) {
   const isOwner = load.userId === currentUserId;
-  // El usuario puede editar si es el dueño O si es administrador
   const canEdit = isOwner || isAdmin;
   const creatorLabel = load.createdByName || (isOwner ? 'Tú' : 'Usuario');
+
+  // Calculamos la franja horaria aquí
+  const puTimeWindow = formatTimeWindow(load.puTimeFrom, load.puTimeTo);
+  const delTimeWindow = formatTimeWindow(load.delTimeFrom, load.delTimeTo);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 group hover:shadow-md hover:border-gray-300 transition-all duration-200">
@@ -298,18 +307,17 @@ function LoadCard({ load, currentUserId, isAdmin, onEdit, onDelete, onStatusChan
             
             {load.puDate && (
               <span className="text-purple-600 font-bold">
-                PU: <span className="text-purple-800 font-medium">{formatDateLocal(load.puDate)} {load.puTimeFrom || ''}</span>
+                PU: <span className="text-purple-800 font-medium">{formatDateLocal(load.puDate)} {puTimeWindow}</span>
               </span>
             )}
             {load.delDate && (
               <span className="text-red-600 font-bold">
-                DEL: <span className="text-red-800 font-medium">{formatDateLocal(load.delDate)} {load.delTimeFrom || ''}</span>
+                DEL: <span className="text-red-800 font-medium">{formatDateLocal(load.delDate)} {delTimeWindow}</span>
               </span>
             )}
           </div>
         </div>
 
-        {/* Aquí cambiamos la condición para usar canEdit */}
         {canEdit && (
           <div className="flex flex-wrap gap-2 transition-opacity shrink-0">
             <button onClick={onEdit} className="p-2.5 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors" title="Editar">
