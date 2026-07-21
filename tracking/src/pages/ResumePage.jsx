@@ -23,7 +23,6 @@ function formatDateLocal(dateStr) {
   return new Date(year, month - 1, day).toLocaleDateString();
 }
 
-// Función para obtener la fecha de hace N días en formato YYYY-MM-DD
 const getFormattedDate = (offset = 0) => {
   const date = new Date();
   date.setDate(date.getDate() + offset);
@@ -33,7 +32,6 @@ const getFormattedDate = (offset = 0) => {
   return `${year}-${month}-${day}`;
 };
 
-// Función para normalizar fechas (por si vienen con hora desde la BD)
 const normalizeDate = (d) => d ? String(d).substring(0, 10) : null;
 
 export default function ResumePage() {
@@ -41,17 +39,21 @@ export default function ResumePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [historyDriverFilter, setHistoryDriverFilter] = useState('all');
-  const [search, setSearch] = useState(''); // Estado para el buscador
+  const [search, setSearch] = useState('');
 
   const fetchData = async () => {
     try {
       const token = await getToken();
       const res = await fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } });
+      
+      if (!res.ok) throw new Error('No se pudo obtener la información del backend');
+      
       const d = await res.json();
       setData(d);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching resume:", error);
+      toast.error('Error al cargar los datos. ¿Está caído el servidor?');
       setLoading(false);
     }
   };
@@ -76,32 +78,9 @@ export default function ResumePage() {
     }
   };
 
-  if (loading) return <LoadingSkeleton />;
-  if (!data) return null;
+  // 1. Hooks deben ir SIEMPRE antes de cualquier return (para evitar el Error 310 de React)
+  const historyLoads = data?.history || [];
 
-  const historyLoads = data.history || [];
-  const historyDrivers = [...new Set(historyLoads.map((load) => load.driverName).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b));
-
-  // Filtrado combinado: Por Driver y por Búsqueda de texto
-  const filteredHistory = historyLoads.filter((load) => {
-    const matchesDriver = historyDriverFilter === 'all' || load.driverName === historyDriverFilter;
-    
-    if (!search) return matchesDriver;
-    
-    const s = search.toLowerCase();
-    const matchesSearch = 
-      load.loadNumber?.toLowerCase().includes(s) ||
-      load.driverName?.toLowerCase().includes(s) ||
-      load.brokerName?.toLowerCase().includes(s) ||
-      load.puCity?.toLowerCase().includes(s) ||
-      load.delCity?.toLowerCase().includes(s) ||
-      load.status?.toLowerCase().includes(s);
-
-    return matchesDriver && matchesSearch;
-  });
-
-  // 1. Gráfico Dinámico: Ingresos de los últimos 7 días
   const last7DaysRevenue = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -114,12 +93,6 @@ export default function ResumePage() {
     return days;
   }, [historyLoads]);
 
-  const revenueDays = last7DaysRevenue.filter((day) => day.revenue > 0);
-  const averageDailyRevenue = revenueDays.length > 0
-    ? revenueDays.reduce((total, day) => total + day.revenue, 0) / revenueDays.length
-    : null;
-
-  // 2. Gráfico Dinámico: Cargas de las últimas 4 semanas
   const last4WeeksLoads = useMemo(() => {
     const weeks = [];
     for (let i = 3; i >= 0; i--) {
@@ -142,6 +115,39 @@ export default function ResumePage() {
     }
     return weeks;
   }, [historyLoads]);
+
+  // 2. Recién aquí podemos hacer los returns si no hay datos
+  if (loading) return <LoadingSkeleton />;
+  if (!data) return (
+    <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-200 shadow-sm">
+      No se pudieron cargar los datos del resumen. Verifica que la ruta /api/resume exista en tu backend.
+    </div>
+  );
+
+  const historyDrivers = [...new Set(historyLoads.map((load) => load.driverName).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+
+  const filteredHistory = historyLoads.filter((load) => {
+    const matchesDriver = historyDriverFilter === 'all' || load.driverName === historyDriverFilter;
+    
+    if (!search) return matchesDriver;
+    
+    const s = search.toLowerCase();
+    const matchesSearch = 
+      load.loadNumber?.toLowerCase().includes(s) ||
+      load.driverName?.toLowerCase().includes(s) ||
+      load.brokerName?.toLowerCase().includes(s) ||
+      load.puCity?.toLowerCase().includes(s) ||
+      load.delCity?.toLowerCase().includes(s) ||
+      load.status?.toLowerCase().includes(s);
+
+    return matchesDriver && matchesSearch;
+  });
+
+  const revenueDays = last7DaysRevenue.filter((day) => day.revenue > 0);
+  const averageDailyRevenue = revenueDays.length > 0
+    ? revenueDays.reduce((total, day) => total + day.revenue, 0) / revenueDays.length
+    : null;
 
   return (
     <div className="space-y-6">
@@ -172,12 +178,11 @@ export default function ResumePage() {
       <UserRevenueRanking users={data.userRevenueRanking || []} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <TopDestinations destinations={data.topDestinations} />
-        <TopDrivers drivers={data.topDrivers} />
+        <TopDestinations destinations={data.topDestinations || []} />
+        <TopDrivers drivers={data.topDrivers || []} />
         <TopBrokers brokers={data.topBrokers || []} />
       </div>
 
-      {/* GRÁFICO DE INGRESOS DIARIOS (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Daily Revenue (Últimos 7 días)</h3>
@@ -200,12 +205,7 @@ export default function ResumePage() {
                   labelFormatter={formatDate}
                 />
                 {averageDailyRevenue !== null && (
-                  <ReferenceLine
-                    y={averageDailyRevenue}
-                    stroke="#d97706"
-                    strokeDasharray="6 4"
-                    strokeWidth={2}
-                  />
+                  <ReferenceLine y={averageDailyRevenue} stroke="#d97706" strokeDasharray="6 4" strokeWidth={2} />
                 )}
                 <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: '#3b82f6' }} />
               </LineChart>
@@ -214,7 +214,6 @@ export default function ResumePage() {
         )}
       </div>
 
-      {/* GRÁFICO DE CARGAS SEMANALES (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads (Últimas 4 semanas)</h3>
         {last4WeeksLoads.length === 0 ? (
@@ -238,13 +237,11 @@ export default function ResumePage() {
         )}
       </div>
 
-      {/* HISTORIAL DE CARGAS CON BUSCADOR Y SCROLL */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Historial de Cargas</h3>
           
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            {/* Buscador nuevo */}
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input 
