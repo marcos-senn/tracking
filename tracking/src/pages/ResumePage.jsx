@@ -9,7 +9,8 @@ const API_SETTINGS = 'https://load-tracker-api-lfau.onrender.com/api/settings';
 
 function formatDate(d) {
   if (!d) return '';
-  const [y, m, day] = d.split('-').map(Number);
+  const cleanDate = String(d).substring(0, 10);
+  const [y, m, day] = cleanDate.split('-').map(Number);
   const date = new Date(y, m - 1, day);
   const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
   return `${weekday} ${day}/${m}`;
@@ -17,7 +18,8 @@ function formatDate(d) {
 
 function formatDateLocal(dateStr) {
   if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-').map(Number);
+  const cleanDate = String(dateStr).substring(0, 10);
+  const [year, month, day] = cleanDate.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString();
 }
 
@@ -30,6 +32,9 @@ const getFormattedDate = (offset = 0) => {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+// Función para normalizar fechas (por si vienen con hora desde la BD)
+const normalizeDate = (d) => d ? String(d).substring(0, 10) : null;
 
 export default function ResumePage() {
   const { getToken } = useAuth();
@@ -102,7 +107,7 @@ export default function ResumePage() {
     for (let i = 6; i >= 0; i--) {
       const dateStr = getFormattedDate(-i);
       const revenue = historyLoads
-        .filter(l => l.delDate === dateStr && l.status === 'Delivered')
+        .filter(l => normalizeDate(l.delDate) === dateStr && l.status === 'Delivered')
         .reduce((sum, l) => sum + (Number(l.rate) || 0), 0);
       days.push({ date: dateStr, revenue });
     }
@@ -128,7 +133,11 @@ export default function ResumePage() {
       const endStr = endOfWeek.toISOString().split('T')[0];
       const startStr = startOfWeek.toISOString().split('T')[0];
 
-      const count = historyLoads.filter(l => l.delDate >= startStr && l.delDate <= endStr).length;
+      const count = historyLoads.filter(l => {
+        const normDate = normalizeDate(l.delDate);
+        return normDate >= startStr && normDate <= endStr;
+      }).length;
+      
       weeks.push({ week: startStr, count });
     }
     return weeks;
