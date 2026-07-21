@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { MapPin, User, RotateCcw, BriefcaseBusiness } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { MapPin, User, RotateCcw, BriefcaseBusiness, Search } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -21,11 +21,22 @@ function formatDateLocal(dateStr) {
   return new Date(year, month - 1, day).toLocaleDateString();
 }
 
+// Función para obtener la fecha de hace N días en formato YYYY-MM-DD
+const getFormattedDate = (offset = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function ResumePage() {
   const { getToken } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [historyDriverFilter, setHistoryDriverFilter] = useState('all');
+  const [search, setSearch] = useState(''); // Estado para el buscador
 
   const fetchData = async () => {
     try {
@@ -63,15 +74,65 @@ export default function ResumePage() {
   if (loading) return <LoadingSkeleton />;
   if (!data) return null;
 
-  const historyDrivers = [...new Set(data.history.map((load) => load.driverName).filter(Boolean))]
+  const historyLoads = data.history || [];
+  const historyDrivers = [...new Set(historyLoads.map((load) => load.driverName).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
-  const filteredHistory = historyDriverFilter === 'all'
-    ? data.history
-    : data.history.filter((load) => load.driverName === historyDriverFilter);
-  const revenueDays = data.dailyRevenue.filter((day) => day.revenue > 0);
+
+  // Filtrado combinado: Por Driver y por Búsqueda de texto
+  const filteredHistory = historyLoads.filter((load) => {
+    const matchesDriver = historyDriverFilter === 'all' || load.driverName === historyDriverFilter;
+    
+    if (!search) return matchesDriver;
+    
+    const s = search.toLowerCase();
+    const matchesSearch = 
+      load.loadNumber?.toLowerCase().includes(s) ||
+      load.driverName?.toLowerCase().includes(s) ||
+      load.brokerName?.toLowerCase().includes(s) ||
+      load.puCity?.toLowerCase().includes(s) ||
+      load.delCity?.toLowerCase().includes(s) ||
+      load.status?.toLowerCase().includes(s);
+
+    return matchesDriver && matchesSearch;
+  });
+
+  // 1. Gráfico Dinámico: Ingresos de los últimos 7 días
+  const last7DaysRevenue = useMemo(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const dateStr = getFormattedDate(-i);
+      const revenue = historyLoads
+        .filter(l => l.delDate === dateStr && l.status === 'Delivered')
+        .reduce((sum, l) => sum + (Number(l.rate) || 0), 0);
+      days.push({ date: dateStr, revenue });
+    }
+    return days;
+  }, [historyLoads]);
+
+  const revenueDays = last7DaysRevenue.filter((day) => day.revenue > 0);
   const averageDailyRevenue = revenueDays.length > 0
     ? revenueDays.reduce((total, day) => total + day.revenue, 0) / revenueDays.length
     : null;
+
+  // 2. Gráfico Dinámico: Cargas de las últimas 4 semanas
+  const last4WeeksLoads = useMemo(() => {
+    const weeks = [];
+    for (let i = 3; i >= 0; i--) {
+      const endOfWeek = new Date();
+      endOfWeek.setHours(0, 0, 0, 0);
+      endOfWeek.setDate(endOfWeek.getDate() - (i * 7));
+      
+      const startOfWeek = new Date(endOfWeek);
+      startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+      const endStr = endOfWeek.toISOString().split('T')[0];
+      const startStr = startOfWeek.toISOString().split('T')[0];
+
+      const count = historyLoads.filter(l => l.delDate >= startStr && l.delDate <= endStr).length;
+      weeks.push({ week: startStr, count });
+    }
+    return weeks;
+  }, [historyLoads]);
 
   return (
     <div className="space-y-6">
@@ -107,19 +168,20 @@ export default function ResumePage() {
         <TopBrokers brokers={data.topBrokers || []} />
       </div>
 
+      {/* GRÁFICO DE INGRESOS DIARIOS (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Daily Revenue</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Daily Revenue (Últimos 7 días)</h3>
           {averageDailyRevenue !== null && (
             <p className="text-sm font-medium text-amber-700">Promedio por día con cargas: ${averageDailyRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
           )}
         </div>
-        {data.dailyRevenue.length === 0 ? (
+        {last7DaysRevenue.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No revenue data yet</p>
         ) : (
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.dailyRevenue}>
+              <LineChart data={last7DaysRevenue}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" tickFormatter={v => `$${v.toLocaleString()}`} />
@@ -143,14 +205,15 @@ export default function ResumePage() {
         )}
       </div>
 
+      {/* GRÁFICO DE CARGAS SEMANALES (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads</h3>
-        {data.weeklyLoads.length === 0 ? (
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads (Últimas 4 semanas)</h3>
+        {last4WeeksLoads.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">No load data yet</p>
         ) : (
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.weeklyLoads}>
+              <BarChart data={last4WeeksLoads}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="week" tick={{ fontSize: 12 }} tickFormatter={formatDate} stroke="#6b7280" />
                 <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" allowDecimals={false} />
@@ -166,22 +229,37 @@ export default function ResumePage() {
         )}
       </div>
 
-      {/* HISTORIAL DE CARGAS CON SCROLL */}
+      {/* HISTORIAL DE CARGAS CON BUSCADOR Y SCROLL */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Historial de Cargas</h3>
-          <select
-            value={historyDriverFilter}
-            onChange={(event) => setHistoryDriverFilter(event.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Todos los conductores</option>
-            {historyDrivers.map((driver) => <option key={driver} value={driver}>{driver}</option>)}
-          </select>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            {/* Buscador nuevo */}
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input 
+                placeholder="Buscar load, ciudad, broker..." 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <select
+              value={historyDriverFilter}
+              onChange={(event) => setHistoryDriverFilter(event.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Todos los conductores</option>
+              {historyDrivers.map((driver) => <option key={driver} value={driver}>{driver}</option>)}
+            </select>
+          </div>
         </div>
+
         {filteredHistory.length === 0 ? (
           <p className="text-sm text-gray-500 py-8 text-center">
-            {historyDriverFilter === 'all' ? 'No hay cargas en el historial todavía.' : 'No hay cargas para este conductor.'}
+            No se encontraron cargas que coincidan con tu búsqueda.
           </p>
         ) : (
           <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
@@ -193,7 +271,6 @@ export default function ResumePage() {
                     <MapPin className="h-3 w-3" />
                     {load.puCity} → {load.delCity}
                   </div>
-                  {/* FECHAS Y HORARIOS DE PU Y DEL */}
                   <div className="flex flex-col sm:flex-row gap-x-4 gap-y-1 mt-2 text-xs">
                     {load.puDate && (
                       <span className="text-purple-700 font-medium">PU: {formatDateLocal(load.puDate)} {load.puTimeFrom || ''}</span>
