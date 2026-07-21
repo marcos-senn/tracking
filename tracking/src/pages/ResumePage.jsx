@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const API_URL = 'https://load-tracker-api-lfau.onrender.com/api/resume';
+const API_LOADS = 'https://load-tracker-api-lfau.onrender.com/api/loads';
 const API_SETTINGS = 'https://load-tracker-api-lfau.onrender.com/api/settings';
 
 function formatDate(d) {
@@ -37,6 +38,7 @@ const normalizeDate = (d) => d ? String(d).substring(0, 10) : null;
 export default function ResumePage() {
   const { getToken } = useAuth();
   const [data, setData] = useState(null);
+  const [allLoads, setAllLoads] = useState([]); // Estado para TODAS las cargas
   const [loading, setLoading] = useState(true);
   const [historyDriverFilter, setHistoryDriverFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -44,16 +46,23 @@ export default function ResumePage() {
   const fetchData = async () => {
     try {
       const token = await getToken();
-      const res = await fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } });
+      // Hacemos 2 peticiones a la vez: los datos del resumen y todas las cargas
+      const [res, loadsRes] = await Promise.all([
+        fetch(API_URL, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(API_LOADS, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
       
-      if (!res.ok) throw new Error('No se pudo obtener la información del backend');
+      if (!res.ok) throw new Error('No se pudo obtener la información del resumen');
       
       const d = await res.json();
+      const loadsData = await loadsRes.json();
+      
       setData(d);
+      setAllLoads(loadsData.loads || []); // Guardamos todas las cargas
       setLoading(false);
     } catch (error) {
       console.error("Error fetching resume:", error);
-      toast.error('Error al cargar los datos. ¿Está caído el servidor?');
+      toast.error('Error al cargar los datos.');
       setLoading(false);
     }
   };
@@ -78,20 +87,18 @@ export default function ResumePage() {
     }
   };
 
-  // 1. Hooks deben ir SIEMPRE antes de cualquier return (para evitar el Error 310 de React)
-  const historyLoads = data?.history || [];
-
+  // Usamos todas las cargas para los gráficos (para que aparezcan el día que se crearon)
   const last7DaysRevenue = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const dateStr = getFormattedDate(-i);
-      const revenue = historyLoads
-        .filter(l => normalizeDate(l.delDate) === dateStr && l.status === 'Delivered')
+      const revenue = allLoads
+        .filter(l => normalizeDate(l.createdAt) === dateStr)
         .reduce((sum, l) => sum + (Number(l.rate) || 0), 0);
       days.push({ date: dateStr, revenue });
     }
     return days;
-  }, [historyLoads]);
+  }, [allLoads]);
 
   const last4WeeksLoads = useMemo(() => {
     const weeks = [];
@@ -106,24 +113,24 @@ export default function ResumePage() {
       const endStr = endOfWeek.toISOString().split('T')[0];
       const startStr = startOfWeek.toISOString().split('T')[0];
 
-      const count = historyLoads.filter(l => {
-        const normDate = normalizeDate(l.delDate);
+      const count = allLoads.filter(l => {
+        const normDate = normalizeDate(l.createdAt);
         return normDate >= startStr && normDate <= endStr;
       }).length;
       
       weeks.push({ week: startStr, count });
     }
     return weeks;
-  }, [historyLoads]);
+  }, [allLoads]);
 
-  // 2. Recién aquí podemos hacer los returns si no hay datos
   if (loading) return <LoadingSkeleton />;
   if (!data) return (
     <div className="text-center py-10 text-gray-500 bg-white rounded-xl border border-gray-200 shadow-sm">
-      No se pudieron cargar los datos del resumen. Verifica que la ruta /api/resume exista en tu backend.
+      No se pudieron cargar los datos del resumen.
     </div>
   );
 
+  const historyLoads = data.history || [];
   const historyDrivers = [...new Set(historyLoads.map((load) => load.driverName).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
 
@@ -183,6 +190,7 @@ export default function ResumePage() {
         <TopBrokers brokers={data.topBrokers || []} />
       </div>
 
+      {/* GRÁFICO DE INGRESOS DIARIOS (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Daily Revenue (Últimos 7 días)</h3>
@@ -214,6 +222,7 @@ export default function ResumePage() {
         )}
       </div>
 
+      {/* GRÁFICO DE CARGAS SEMANALES (DINÁMICO) */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full overflow-hidden">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Loads (Últimas 4 semanas)</h3>
         {last4WeeksLoads.length === 0 ? (
@@ -237,6 +246,7 @@ export default function ResumePage() {
         )}
       </div>
 
+      {/* HISTORIAL DE CARGAS CON BUSCADOR Y SCROLL */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Historial de Cargas</h3>
